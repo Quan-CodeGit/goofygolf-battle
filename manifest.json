@@ -1,0 +1,11 @@
+{
+  "name": "Goofy Golf Battle",
+  "short_name": "Goofy Golf",
+  "description": "1v1 mini golf battle game",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#EEECDA",
+  "theme_color": "#7A8C30",
+  "icons": []
+}

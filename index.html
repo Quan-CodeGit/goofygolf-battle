@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Goofy Golf Battle!</title>
+  <link rel="manifest" href="/manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
@@ -803,7 +804,7 @@ const POWER_MULTIPLIER   = 0.18;
 const MIN_SHOOT_POWER    = 8;
 const WALL_BOUNCE        = 0.72;
 const TREE_BOUNCE        = 0.60;
-const HOLE_CAPTURE_SPEED = 3.0;
+const HOLE_CAPTURE_SPEED = 8.0;  // px/frame — faster = rolls over hole
 const STOP_THRESHOLD     = 0.25;
 const TREE_COLLIDE_FRAC  = 0.055;   // tree collision radius as fraction of min(W,H)
 const HOLE_TRIGGER_FRAC  = 14 / 600;
@@ -1355,6 +1356,8 @@ function physicsUpdate(dt) {
   const treeBaseR  = TREE_COLLIDE_FRAC * Math.min(W, H);
   const holeR      = HOLE_TRIGGER_FRAC * Math.min(W, H);
   const steps      = Math.max(1, Math.round(Math.min(dt, 50) / 16.67));
+  const h1x = W*LAYOUT.h1.x, h1y = H*LAYOUT.h1.y;
+  const h2x = W*LAYOUT.h2.x, h2y = H*LAYOUT.h2.y;
 
   for (let s = 0; s < steps; s++) {
     // Track last safe position before each move
@@ -1398,18 +1401,18 @@ function physicsUpdate(dt) {
       vx = 0; vy = 0; ballMoving = false; gameState = 'IDLE';
       GOLF.nextTurn(); return;
     }
+
+    // Hole capture — checked each substep so fast balls don't skip through
+    // Speed gate: too fast = rolls over (realistic lip-out)
+    const spdNow = Math.hypot(vx, vy);
+    if (spdNow <= HOLE_CAPTURE_SPEED) {
+      if (Math.hypot(ballPos.x-h1x, ballPos.y-h1y) < holeR) return handleHoleSink(1);
+      if (Math.hypot(ballPos.x-h2x, ballPos.y-h2y) < holeR) return handleHoleSink(2);
+    }
   }
 
-  // Hole capture (after all sub-steps)
-  const speed = Math.hypot(vx, vy);
-  const h1x = W*LAYOUT.h1.x, h1y = H*LAYOUT.h1.y;
-  const h2x = W*LAYOUT.h2.x, h2y = H*LAYOUT.h2.y;
-  if (Math.hypot(ballPos.x-h1x, ballPos.y-h1y) < holeR)
-    return handleHoleSink(1);
-  if (Math.hypot(ballPos.x-h2x, ballPos.y-h2y) < holeR)
-    return handleHoleSink(2);
-
   // Ball stopped
+  const speed = Math.hypot(vx, vy);
   if (speed < STOP_THRESHOLD) {
     vx = 0; vy = 0; ballMoving = false; gameState = 'IDLE';
     GOLF.nextTurn();
@@ -1587,6 +1590,12 @@ window.addEventListener('resize', () => {
     resizeCanvas();
   }
 });
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
 </script>
 
 </body>
