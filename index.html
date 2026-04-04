@@ -735,16 +735,16 @@ const menu = $('menu'), game = $('game');
 const gc   = $('gc'), ctx = gc.getContext('2d');
 
 // ─── Course layout (all positions are 0..1 fractions of W / H) ──────────────
-// Holes are always fixed at opposite corners
-const H1 = { x: 0.80, y: 0.18 };
-const H2 = { x: 0.18, y: 0.80 };
-
 function generateLayout(seed) {
   const rng = mkRng(seed >>> 0);
 
+  // Holes in opposite quadrants — P1 top-right zone, P2 bottom-left zone
+  const h1 = { x: 0.62 + rng() * 0.24, y: 0.08 + rng() * 0.22 };
+  const h2 = { x: 0.14 + rng() * 0.24, y: 0.70 + rng() * 0.22 };
+
   function nearHole(x, y, margin) {
-    return Math.hypot(x - H1.x, y - H1.y) < margin ||
-           Math.hypot(x - H2.x, y - H2.y) < margin;
+    return Math.hypot(x - h1.x, y - h1.y) < margin ||
+           Math.hypot(x - h2.x, y - h2.y) < margin;
   }
 
   // Water hazard — random position in mid-field, away from holes
@@ -792,7 +792,7 @@ function generateLayout(seed) {
     if (ta < 30) trees.push({ x: tx, y: ty, sc: 0.65 + rng() * 0.42 });
   }
 
-  return { h1: H1, h2: H2, water, sands, trees };
+  return { h1, h2, water, sands, trees };
 }
 
 let LAYOUT = generateLayout(0x600F7B47);  // stable first-round layout
