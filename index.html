@@ -1,0 +1,1546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Mini Golf 1v1</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    /* ═══════════════════════════════════════════
+       DESIGN TOKENS
+    ═══════════════════════════════════════════ */
+    :root {
+      --cream:       #EEECDA;
+      --olive:       #7A8C30;
+      --olive-dk:    #5C6A24;
+      --olive-lt:    #8FA038;
+      --gray:        #C4C5B4;
+      --gray-dk:     #9E9F90;
+      --lime:        #C8D15A;
+      --lime-dk:     #A8B140;
+      --brown:       #6B3A22;
+      --brown-dk:    #4E2A18;
+      --brown-lt:    #7A4428;
+      --sky:         #B8CEDF;
+      --teal:        #7AAEAA;
+      --teal-dk:     #5A8E8A;
+    }
+
+    /* ═══════════════════════════════════════════
+       RESET & BASE
+    ═══════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; }
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: var(--cream);
+      touch-action: none;
+    }
+
+    /* ═══════════════════════════════════════════
+       SCREEN SYSTEM
+    ═══════════════════════════════════════════ */
+    .screen {
+      position: fixed; inset: 0;
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+    .screen.hidden {
+      opacity: 0; pointer-events: none;
+      transform: scale(0.97);
+    }
+
+    /* ═══════════════════════════════════════════
+       MENU SCREEN
+    ═══════════════════════════════════════════ */
+    #menu {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--cream);
+      overflow: hidden;
+    }
+
+    /* Subtle polka-dot texture */
+    #menu::before {
+      content: '';
+      position: absolute; inset: 0;
+      background-image: radial-gradient(circle, var(--gray) 1.5px, transparent 1.5px);
+      background-size: 30px 30px;
+      opacity: 0.3;
+    }
+
+    /* ── Wavy hills SVG ── */
+    .hills {
+      position: absolute; bottom: -2px; left: 0; right: 0;
+      width: 100%; height: 200px; pointer-events: none;
+    }
+
+    /* ── Floating decorations ── */
+    .deco {
+      position: absolute; pointer-events: none;
+      animation: floatY var(--dur, 4s) ease-in-out infinite;
+      animation-delay: var(--delay, 0s);
+    }
+    @keyframes floatY {
+      0%, 100% { transform: translateY(0) rotate(var(--r0, 0deg)); }
+      50%       { transform: translateY(var(--ty, -12px)) rotate(var(--r1, 0deg)); }
+    }
+
+    /* ── Menu content ── */
+    .menu-inner {
+      position: relative; z-index: 2;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 30px;
+      padding: 20px;
+    }
+
+    /* ── Hero ball ── */
+    .hero-ball {
+      width: 84px; height: 84px; border-radius: 50%;
+      background: radial-gradient(circle at 36% 32%, #ffffff 0%, #e8e8e8 45%, #c8c8c8 100%);
+      box-shadow: 3px 5px 0 #b0b0b0, 0 10px 28px rgba(0,0,0,0.16);
+      position: relative; overflow: hidden;
+      animation:
+        ballDrop 0.75s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+        ballBob  2.8s ease-in-out 0.75s infinite;
+    }
+    .hero-ball::before {
+      content: '';
+      position: absolute; top: 36%; left: 18%; width: 64%; height: 7%;
+      border-radius: 50%; background: rgba(0,0,0,0.07);
+    }
+    .hero-ball::after {
+      content: '';
+      position: absolute; top: 52%; left: 28%; width: 44%; height: 6%;
+      border-radius: 50%; background: rgba(0,0,0,0.05);
+    }
+    @keyframes ballDrop {
+      from { transform: translateY(-130px) scale(0.75); opacity: 0; }
+      to   { transform: translateY(0) scale(1); opacity: 1; }
+    }
+    @keyframes ballBob {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-9px); }
+    }
+
+    /* ── Title ── */
+    .title-wrap {
+      text-align: center;
+      animation: fadeUp 0.55s ease 0.2s both;
+    }
+    .game-title {
+      font-family: 'Fredoka One', cursive;
+      font-size: clamp(54px, 12vw, 100px);
+      color: var(--olive);
+      line-height: 0.95;
+      letter-spacing: -1px;
+      text-shadow: 4px 4px 0 var(--lime), 7px 7px 0 rgba(122,140,48,0.12);
+    }
+    .game-sub {
+      font-family: 'Fredoka One', cursive;
+      font-size: clamp(15px, 3.5vw, 26px);
+      color: var(--brown);
+      letter-spacing: 5px;
+      text-transform: uppercase;
+      margin-top: 6px;
+    }
+
+    /* ── Buttons ── */
+    .btn-stack {
+      display: flex; flex-direction: column; gap: 15px;
+      width: min(320px, 90vw);
+      animation: fadeUp 0.5s ease 0.35s both;
+    }
+    @keyframes fadeUp {
+      from { transform: translateY(18px); opacity: 0; }
+      to   { transform: translateY(0); opacity: 1; }
+    }
+
+    .btn {
+      font-family: 'Fredoka One', cursive;
+      font-size: 22px; letter-spacing: 0.5px;
+      border: none; border-radius: 18px;
+      padding: 16px 28px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      width: 100%; color: #fff;
+      position: relative; top: 0;
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .btn:hover { transform: translateY(-3px); }
+    .btn:active { transform: translateY(4px) !important; }
+
+    .btn-play {
+      background: var(--olive);
+      box-shadow: 0 7px 0 var(--olive-dk), 0 12px 24px rgba(92,106,36,0.28);
+    }
+    .btn-play:hover { background: var(--olive-lt); box-shadow: 0 9px 0 var(--olive-dk), 0 16px 28px rgba(92,106,36,0.32); }
+    .btn-play:active { box-shadow: 0 2px 0 var(--olive-dk) !important; }
+
+    .btn-how {
+      background: var(--brown);
+      box-shadow: 0 7px 0 var(--brown-dk), 0 12px 24px rgba(78,42,24,0.28);
+    }
+    .btn-how:hover { background: var(--brown-lt); box-shadow: 0 9px 0 var(--brown-dk), 0 16px 28px rgba(78,42,24,0.32); }
+    .btn-how:active { box-shadow: 0 2px 0 var(--brown-dk) !important; }
+
+    .btn-icon { font-size: 24px; }
+
+    /* ═══════════════════════════════════════════
+       GAME SCREEN
+    ═══════════════════════════════════════════ */
+    #game {
+      display: flex; flex-direction: column;
+      background: var(--cream);
+    }
+
+    /* ── HUD ── */
+    .hud {
+      display: flex; align-items: stretch;
+      height: 90px; flex-shrink: 0;
+      background: #fff;
+      border-bottom: 3px solid var(--gray);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+    }
+
+    .p-hud {
+      flex: 1; display: flex; align-items: center;
+      gap: 12px; padding: 10px 18px;
+      transition: opacity 0.35s ease;
+    }
+    .p-hud.dim { opacity: 0.5; }
+
+    .p1-hud {
+      background: linear-gradient(115deg, var(--lime-dk) 0%, var(--lime) 100%);
+      border-radius: 0 0 24px 0;
+    }
+    .p1-hud .p-avatar, .p1-hud .p-name { color: var(--olive-dk); }
+    .p2-hud {
+      background: linear-gradient(245deg, var(--brown) 0%, var(--brown-lt) 100%);
+      border-radius: 0 0 0 24px;
+      flex-direction: row-reverse;
+    }
+
+    .p-avatar {
+      width: 52px; height: 52px; border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.4);
+      background: rgba(255,255,255,0.2);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Fredoka One', cursive;
+      font-size: 21px; color: #fff; flex-shrink: 0;
+    }
+
+    .p-info { display: flex; flex-direction: column; gap: 5px; }
+    .p2-hud .p-info { align-items: flex-end; }
+
+    .p-name {
+      font-family: 'Fredoka One', cursive;
+      font-size: 14px; color: rgba(255,255,255,0.88);
+      letter-spacing: 1.5px; text-transform: uppercase;
+    }
+
+    .p-wins { display: flex; gap: 5px; }
+    .win-pip {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: rgba(255,255,255,0.22);
+      border: 2.5px solid rgba(255,255,255,0.38);
+      transition: all 0.3s ease;
+    }
+    .win-pip.lit {
+      background: var(--lime);
+      border-color: var(--lime);
+      box-shadow: 0 0 8px var(--lime);
+    }
+
+    /* ── HUD Center ── */
+    .hud-center {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 8px 16px; gap: 5px; min-width: 138px;
+    }
+    .round-eyebrow {
+      font-family: 'Fredoka One', cursive;
+      font-size: 11px; color: var(--gray-dk);
+      letter-spacing: 2.5px; text-transform: uppercase;
+    }
+    .round-num {
+      font-family: 'Fredoka One', cursive;
+      font-size: 30px; line-height: 1; color: var(--brown);
+    }
+    .turn-pill {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--cream);
+      border: 2.5px solid var(--gray);
+      border-radius: 20px; padding: 4px 11px;
+    }
+    .turn-pip {
+      width: 9px; height: 9px; border-radius: 50%;
+      background: var(--olive);
+      animation: pipPulse 1.1s ease-in-out infinite;
+    }
+    @keyframes pipPulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50%       { transform: scale(1.45); opacity: 0.55; }
+    }
+    .turn-label {
+      font-family: 'Fredoka One', cursive;
+      font-size: 13px; color: var(--brown);
+    }
+
+    /* ── Canvas ── */
+    .canvas-wrap { flex: 1; position: relative; overflow: hidden; min-height: 0; }
+    #gc { width: 100%; height: 100%; display: block; }
+
+    /* ── Bottom Bar ── */
+    .bottom-bar {
+      height: 60px; flex-shrink: 0;
+      background: #fff;
+      border-top: 3px solid var(--gray);
+      display: flex; align-items: center;
+      padding: 0 16px; gap: 12px;
+    }
+    .btn-sm {
+      font-family: 'Fredoka One', cursive;
+      font-size: 14px; border: none; border-radius: 12px;
+      padding: 8px 15px; cursor: pointer;
+      display: flex; align-items: center; gap: 5px;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-quit {
+      background: var(--gray); color: #fff;
+      box-shadow: 0 3px 0 var(--gray-dk);
+    }
+    .btn-quit:hover  { background: var(--gray-dk); transform: translateY(-1px); }
+    .btn-quit:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--gray-dk); }
+
+    .hint-text {
+      flex: 1; text-align: center;
+      font-size: 13px; font-weight: 800;
+      color: var(--gray-dk); letter-spacing: 0.2px;
+    }
+
+    .stroke-chip {
+      font-family: 'Fredoka One', cursive;
+      font-size: 14px; white-space: nowrap;
+      background: var(--lime); color: var(--olive-dk);
+      padding: 6px 13px; border-radius: 12px;
+      box-shadow: 0 3px 0 var(--lime-dk);
+    }
+
+    /* ═══════════════════════════════════════════
+       HOW TO PLAY MODAL
+    ═══════════════════════════════════════════ */
+    .overlay {
+      position: fixed; inset: 0; z-index: 300;
+      background: rgba(238,236,218,0.80);
+      backdrop-filter: blur(10px) saturate(1.1);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .overlay.show { opacity: 1; pointer-events: all; }
+
+    .modal {
+      background: #fff; border-radius: 28px;
+      padding: 32px 26px;
+      width: min(440px, 92vw); max-height: 88vh;
+      overflow-y: auto;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.13), 0 0 0 3px var(--gray);
+      transform: scale(0.87);
+      transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .overlay.show .modal { transform: scale(1); }
+
+    .modal-h {
+      font-family: 'Fredoka One', cursive;
+      font-size: 30px; color: var(--brown);
+      text-align: center; margin-bottom: 18px;
+    }
+
+    .p-chips {
+      display: flex; gap: 10px; justify-content: center; margin-bottom: 22px;
+    }
+    .p-chip {
+      font-family: 'Fredoka One', cursive; font-size: 15px;
+      padding: 7px 16px; border-radius: 14px;
+      display: flex; align-items: center; gap: 8px; color: #fff;
+    }
+    .p-chip.c1 { background: var(--lime-dk); color: var(--olive-dk); }
+    .p-chip.c2 { background: var(--brown); }
+    .chip-orb {
+      width: 16px; height: 16px;
+      background: rgba(255,255,255,0.35); border-radius: 50%;
+    }
+
+    .steps { display: flex; flex-direction: column; gap: 14px; }
+    .step  { display: flex; gap: 14px; align-items: flex-start; }
+    .step-n {
+      width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Fredoka One', cursive; font-size: 17px; color: #fff;
+    }
+    .step-t {
+      font-size: 14px; font-weight: 700; line-height: 1.55;
+      color: #555; padding-top: 7px;
+    }
+    .step-t b { color: var(--brown); }
+
+    .modal-cta {
+      margin-top: 22px; width: 100%;
+      font-size: 20px;
+      box-shadow: 0 6px 0 var(--olive-dk), 0 10px 20px rgba(92,106,36,0.22);
+    }
+    .modal-cta:hover { box-shadow: 0 8px 0 var(--olive-dk), 0 14px 24px rgba(92,106,36,0.28); }
+    .modal-cta:active { box-shadow: 0 2px 0 var(--olive-dk) !important; }
+
+    /* ── Win screen overlay ── */
+    .win-overlay {
+      position: fixed; inset: 0; z-index: 400;
+      background: rgba(238,236,218,0.88);
+      backdrop-filter: blur(12px);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.35s ease;
+    }
+    .win-overlay.show { opacity: 1; pointer-events: all; }
+
+    .win-box {
+      background: #fff; border-radius: 32px;
+      padding: 40px 32px; text-align: center;
+      width: min(380px, 90vw);
+      box-shadow: 0 28px 70px rgba(0,0,0,0.13), 0 0 0 3px var(--gray);
+      transform: scale(0.8);
+      transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .win-overlay.show .win-box { transform: scale(1); }
+
+    .win-emoji { font-size: 64px; display: block; margin-bottom: 10px; }
+    .win-title {
+      font-family: 'Fredoka One', cursive;
+      font-size: 38px; color: var(--olive); margin-bottom: 6px;
+    }
+    .win-sub {
+      font-family: 'Fredoka One', cursive;
+      font-size: 18px; color: var(--gray-dk); margin-bottom: 24px;
+    }
+    .win-btns { display: flex; gap: 12px; justify-content: center; }
+    .win-btns .btn { width: auto; padding: 14px 24px; font-size: 19px; }
+
+    /* ═══════════════════════════════════════════
+       COIN FLIP OVERLAY
+    ═══════════════════════════════════════════ */
+    .coin-overlay {
+      position: fixed; inset: 0; z-index: 500;
+      background: rgba(238,236,218,0.93);
+      backdrop-filter: blur(14px);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+    .coin-overlay.show { opacity: 1; pointer-events: all; }
+
+    .coin-box {
+      background: #fff; border-radius: 32px;
+      padding: 36px 28px 32px; text-align: center;
+      width: min(340px, 88vw);
+      box-shadow: 0 28px 70px rgba(0,0,0,0.13), 0 0 0 3px var(--gray);
+      transform: scale(0.85);
+      transition: transform 0.45s cubic-bezier(0.34,1.56,0.64,1);
+      display: flex; flex-direction: column; align-items: center; gap: 0;
+    }
+    .coin-overlay.show .coin-box { transform: scale(1); }
+
+    .coin-title {
+      font-family: 'Fredoka One', cursive;
+      font-size: 28px; color: var(--brown); margin-bottom: 10px;
+    }
+    .coin-rule {
+      font-size: 13px; font-weight: 700; color: var(--gray-dk);
+      margin-bottom: 26px; line-height: 1.9;
+    }
+    .coin-rule strong { font-size: 14px; }
+
+    .coin-wrap {
+      perspective: 500px;
+      width: 96px; height: 96px;
+      margin-bottom: 24px;
+    }
+    .coin {
+      width: 96px; height: 96px;
+      position: relative; transform-style: preserve-3d;
+      will-change: transform;
+    }
+    .coin-face {
+      position: absolute; inset: 0; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Fredoka One', cursive; font-size: 22px;
+      backface-visibility: hidden; -webkit-backface-visibility: hidden;
+      box-shadow: inset 0 -5px 0 rgba(0,0,0,0.22), 0 6px 16px rgba(0,0,0,0.18);
+    }
+    .coin-head {
+      background: linear-gradient(145deg, var(--lime) 0%, var(--lime-dk) 100%);
+      color: var(--olive-dk);
+    }
+    .coin-tail {
+      background: linear-gradient(145deg, var(--brown-lt) 0%, var(--brown-dk) 100%);
+      color: #fff;
+      transform: rotateY(180deg);
+    }
+
+    .coin-result {
+      font-family: 'Fredoka One', cursive;
+      font-size: 21px; min-height: 52px; line-height: 1.4;
+      margin-bottom: 18px;
+    }
+    .coin-result .coin-sub {
+      display: block; font-size: 14px;
+      font-family: 'Nunito', sans-serif; font-weight: 700;
+      color: var(--gray-dk); margin-top: 2px;
+    }
+
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════
+     MENU SCREEN
+════════════════════════════════════ -->
+<div class="screen" id="menu">
+
+  <!-- Wavy hills -->
+  <svg class="hills" viewBox="0 0 1400 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M0 130 Q180 50 360 130 Q540 210 720 120 Q900 40 1080 120 Q1260 195 1400 110 L1400 200 L0 200Z" fill="#7A8C30" opacity="0.5"/>
+    <path d="M0 150 Q220 80 440 155 Q660 225 880 145 Q1100 65 1400 140 L1400 200 L0 200Z" fill="#7A8C30"/>
+    <path d="M0 170 Q280 120 560 165 Q840 205 1120 158 Q1280 135 1400 168 L1400 200 L0 200Z" fill="#C8D15A" opacity="0.4"/>
+    <!-- Tiny flowers on the hills -->
+    <circle cx="120"  cy="172" r="4" fill="#C8D15A"/>
+    <circle cx="280"  cy="180" r="3" fill="#EEECDA" opacity="0.9"/>
+    <circle cx="470"  cy="170" r="4" fill="#C8D15A"/>
+    <circle cx="680"  cy="162" r="3" fill="#EEECDA" opacity="0.8"/>
+    <circle cx="870"  cy="174" r="5" fill="#C8D15A"/>
+    <circle cx="1100" cy="168" r="4" fill="#EEECDA" opacity="0.9"/>
+    <circle cx="1300" cy="175" r="3" fill="#C8D15A"/>
+  </svg>
+
+  <!-- Floating ⛳ flag -->
+  <div class="deco" style="top:10%; left:6%; font-size:44px; --dur:3.6s; --ty:-13px; --r0:-7deg; --r1:-12deg;">⛳</div>
+
+  <!-- Yellow star -->
+  <div class="deco" style="top:16%; right:8%; --dur:4.2s; --delay:0.5s; --ty:-11px; --r0:8deg; --r1:14deg;">
+    <svg width="42" height="42" viewBox="0 0 42 42">
+      <polygon points="21,3 25.5,15 39,15 28.5,23 32,36 21,28.5 10,36 13.5,23 3,15 16.5,15" fill="#C8D15A"/>
+    </svg>
+  </div>
+
+  <!-- Teal diamond -->
+  <div class="deco" style="top:55%; left:4%; --dur:5.1s; --delay:0.9s; --ty:-8px; --r0:0deg; --r1:10deg;">
+    <svg width="30" height="30" viewBox="0 0 30 30">
+      <rect x="7" y="7" width="16" height="16" rx="3" fill="#7AAEAA" transform="rotate(45 15 15)"/>
+    </svg>
+  </div>
+
+  <!-- Sky circle -->
+  <div class="deco" style="top:28%; right:4%; --dur:4.8s; --delay:1.3s; --ty:-13px;">
+    <svg width="26" height="26" viewBox="0 0 26 26">
+      <circle cx="13" cy="13" r="11" fill="#B8CEDF"/>
+    </svg>
+  </div>
+
+  <!-- Small olive star -->
+  <div class="deco" style="top:70%; right:7%; --dur:3.9s; --delay:0.3s; --ty:-10px; --r0:5deg; --r1:-5deg;">
+    <svg width="24" height="24" viewBox="0 0 24 24">
+      <polygon points="12,2 14.5,9 22,9 16,13.5 18,21 12,17 6,21 8,13.5 2,9 9.5,9" fill="#7A8C30" opacity="0.6"/>
+    </svg>
+  </div>
+
+  <div class="menu-inner">
+    <!-- Bouncing ball -->
+    <div class="hero-ball"></div>
+
+    <!-- Title -->
+    <div class="title-wrap">
+      <h1 class="game-title">MINI GOLF</h1>
+      <p class="game-sub">1v1 Challenge</p>
+    </div>
+
+    <!-- CTA Buttons -->
+    <div class="btn-stack">
+      <button class="btn btn-play" id="btnPlay">
+        <span class="btn-icon">⛳</span>
+        Play 2 Players
+      </button>
+      <button class="btn btn-how" id="btnHow">
+        <span class="btn-icon">❓</span>
+        How to Play
+      </button>
+    </div>
+  </div>
+
+</div><!-- /#menu -->
+
+
+<!-- ════════════════════════════════════
+     GAME SCREEN
+════════════════════════════════════ -->
+<div class="screen hidden" id="game">
+
+  <!-- HUD -->
+  <div class="hud">
+
+    <!-- Player 1 (olive) -->
+    <div class="p-hud p1-hud" id="hudP1">
+      <div class="p-avatar">P1</div>
+      <div class="p-info">
+        <span class="p-name">Player 1</span>
+        <div class="p-wins" id="winsP1">
+          <div class="win-pip"></div>
+          <div class="win-pip"></div>
+          <div class="win-pip"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center -->
+    <div class="hud-center">
+      <span class="round-eyebrow">Round</span>
+      <span class="round-num" id="roundNum">1 / 5</span>
+      <div class="turn-pill">
+        <div class="turn-pip" id="turnPip"></div>
+        <span class="turn-label" id="turnLabel">P1's Turn</span>
+      </div>
+    </div>
+
+    <!-- Player 2 (brown) -->
+    <div class="p-hud p2-hud dim" id="hudP2">
+      <div class="p-info">
+        <span class="p-name">Player 2</span>
+        <div class="p-wins" id="winsP2">
+          <div class="win-pip"></div>
+          <div class="win-pip"></div>
+          <div class="win-pip"></div>
+        </div>
+      </div>
+      <div class="p-avatar">P2</div>
+    </div>
+
+  </div><!-- /.hud -->
+
+  <!-- Game Canvas -->
+  <div class="canvas-wrap">
+    <canvas id="gc"></canvas>
+  </div>
+
+  <!-- Bottom bar -->
+  <div class="bottom-bar">
+    <button class="btn-sm btn-quit" id="btnQuit">🏠 Quit</button>
+    <span class="hint-text">Hold &amp; drag backward → release to shoot</span>
+    <div class="stroke-chip" id="strokeChip">Strokes: 0</div>
+  </div>
+
+</div><!-- /#game -->
+
+
+<!-- ════════════════════════════════════
+     HOW TO PLAY MODAL
+════════════════════════════════════ -->
+<div class="overlay" id="htpOverlay">
+  <div class="modal">
+    <h2 class="modal-h">How to Play ⛳</h2>
+
+    <div class="p-chips">
+      <div class="p-chip c1"><div class="chip-orb"></div> Player 1</div>
+      <div class="p-chip c2"><div class="chip-orb"></div> Player 2</div>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-n" style="background:var(--olive)">1</div>
+        <div class="step-t">Both players share <b>one golf ball</b> placed at a neutral spot — equally far from both holes.</div>
+      </div>
+      <div class="step">
+        <div class="step-n" style="background:var(--teal)">2</div>
+        <div class="step-t"><b>Click &amp; hold</b> the ball, drag backward to aim and charge power, then release to fire!</div>
+      </div>
+      <div class="step">
+        <div class="step-n" style="background:var(--brown)">3</div>
+        <div class="step-t">Each player has <b>their own coloured hole</b>. Sink the ball in YOUR hole to win the round!</div>
+      </div>
+      <div class="step">
+        <div class="step-n" style="background:var(--lime); color:var(--olive-dk)">4</div>
+        <div class="step-t">You can also <b>block your opponent</b> — hit the ball away from their hole. Strategy wins!</div>
+      </div>
+      <div class="step">
+        <div class="step-n" style="background:var(--sky); color:#3a5a6a">5</div>
+        <div class="step-t">Avoid <b>trees, ponds</b> &amp; sand traps. First to win <b>3 out of 5 rounds</b> takes the match!</div>
+      </div>
+    </div>
+
+    <button class="btn btn-play modal-cta" id="htpClose">
+      Got it! Let's Play 🎉
+    </button>
+  </div>
+</div><!-- /#htpOverlay -->
+
+
+<!-- ════════════════════════════════════
+     WIN SCREEN
+════════════════════════════════════ -->
+<div class="win-overlay" id="winOverlay">
+  <div class="win-box">
+    <span class="win-emoji" id="winEmoji">🏆</span>
+    <div class="win-title" id="winTitle">Player 1 Wins!</div>
+    <div class="win-sub"  id="winSub">Best of 5 champion!</div>
+    <div class="win-btns">
+      <button class="btn btn-play" id="btnPlayAgain">▶ Play Again</button>
+      <button class="btn btn-how"  id="btnMenu">🏠 Menu</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════
+     COIN FLIP OVERLAY
+════════════════════════════════════ -->
+<div class="coin-overlay" id="coinOverlay">
+  <div class="coin-box">
+    <div class="coin-title">🪙 Who Goes First?</div>
+    <div class="coin-rule">
+      <strong style="color:#A8B140">Head → Player 1</strong> goes first<br>
+      <strong style="color:#6B3A22">Tail → Player 2</strong> goes first
+    </div>
+    <div class="coin-wrap">
+      <div class="coin" id="coin">
+        <div class="coin-face coin-head">P1</div>
+        <div class="coin-face coin-tail">P2</div>
+      </div>
+    </div>
+    <div class="coin-result" id="coinResult"></div>
+    <button class="btn btn-play" id="coinCta" style="display:none">Let's Play! 🎉</button>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════
+     SCRIPT
+════════════════════════════════════ -->
+<script>
+// ─── DOM refs ────────────────────────────────────────────────────────────────
+const $    = id => document.getElementById(id);
+const menu = $('menu'), game = $('game');
+const gc   = $('gc'), ctx = gc.getContext('2d');
+
+// ─── Course layout (all positions are 0..1 fractions of W / H) ──────────────
+const LAYOUT = {
+  h1:    { x: 0.80, y: 0.18 },   // P1 hole — top-right
+  h2:    { x: 0.18, y: 0.80 },   // P2 hole — bottom-left
+  water: { cx: 0.46, cy: 0.50, rx: 0.064, ry: 0.082, rot: -0.2 },
+  sands: [
+    { cx: 0.64, cy: 0.74, rx: 0.037, ry: 0.048 },
+    { cx: 0.28, cy: 0.32, rx: 0.029, ry: 0.038 },
+  ],
+  trees: [
+    { x: 0.28, y: 0.26, sc: 1.00 },
+    { x: 0.70, y: 0.36, sc: 0.88 },
+    { x: 0.54, y: 0.20, sc: 0.74 },
+    { x: 0.36, y: 0.68, sc: 0.92 },
+    { x: 0.76, y: 0.68, sc: 0.78 },
+  ],
+};
+
+// ─── Physics constants ────────────────────────────────────────────────────────
+const MAX_DRAG_DISTANCE  = 120;
+const POWER_MULTIPLIER   = 0.18;
+const MIN_SHOOT_POWER    = 8;
+const WALL_BOUNCE        = 0.72;
+const TREE_BOUNCE        = 0.60;
+const HOLE_CAPTURE_SPEED = 3.0;
+const STOP_THRESHOLD     = 0.25;
+const TREE_COLLIDE_FRAC  = 0.055;   // tree collision radius as fraction of min(W,H)
+const HOLE_TRIGGER_FRAC  = 14 / 600;
+
+// ─── Game state ──────────────────────────────────────────────────────────────
+let S = { round: 1, turn: 1, strokes: 0, wins: [0, 0] };
+let pendingFirstPlayer = 1;   // set by coin flip before each match
+let ballPos    = null;   // { x, y } in canvas pixels — null = recalculate
+let lastSafePos= null;   // last non-water position
+
+// ─── Physics state ────────────────────────────────────────────────────────────
+let vx = 0, vy = 0;
+let ballMoving  = false;
+let gameState   = 'IDLE';   // 'IDLE' | 'AIMING' | 'BALL_MOVING'
+let dragStart   = null;     // { x, y } canvas-local coords
+let dragCurrent = null;
+let rafId         = null;
+let lastTS        = 0;
+let ballRotation  = 0;   // accumulated roll angle (radians)
+let ballDir       = 0;   // movement direction angle (radians)
+
+// ─── Seeded RNG (Mulberry32) — stable texture across redraws ─────────────────
+function mkRng(seed) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// ─── Screen helpers ──────────────────────────────────────────────────────────
+function showMenu() {
+  if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  game.classList.add('hidden'); menu.classList.remove('hidden');
+}
+function showGame() {
+  menu.classList.add('hidden'); game.classList.remove('hidden');
+  showCoinFlip();
+}
+function showHTP()  { $('htpOverlay').classList.add('show'); }
+function hideHTP()  { $('htpOverlay').classList.remove('show'); }
+function showWin(p) {
+  $('winEmoji').textContent = '🏆';
+  $('winTitle').textContent = `Player ${p} Wins!`;
+  $('winTitle').style.color = p === 1 ? '#A8B140' : '#6B3A22';
+  $('winSub').textContent   = 'Best of 5 champion!';
+  $('winOverlay').classList.add('show');
+}
+function hideWin() { $('winOverlay').classList.remove('show'); }
+
+// ─── Coin flip ───────────────────────────────────────────────────────────────
+function showCoinFlip() {
+  const overlay = $('coinOverlay');
+  const coin    = $('coin');
+  const result  = $('coinResult');
+  const cta     = $('coinCta');
+  coin.style.transition  = 'none';
+  coin.style.transform   = 'rotateY(0deg)';
+  result.textContent     = '';
+  result.className       = 'coin-result';
+  cta.style.display      = 'none';
+  overlay.classList.add('show');
+  setTimeout(flipCoin, 600);
+}
+
+function flipCoin() {
+  const coin   = $('coin');
+  const result = $('coinResult');
+  const cta    = $('coinCta');
+  const isHeads = Math.random() < 0.5;
+  pendingFirstPlayer = isHeads ? 1 : 2;
+
+  const targetDeg = 6 * 360 + (isHeads ? 0 : 180);
+  const duration  = 2200;
+  const startTime = performance.now();
+
+  function animate(now) {
+    const elapsed  = now - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    // Ease-out quartic
+    const eased    = 1 - Math.pow(1 - progress, 4);
+    coin.style.transition = 'none';
+    coin.style.transform  = `rotateY(${eased * targetDeg}deg)`;
+
+    if (progress < 1) {
+      requestAnimationFrame(animate);
+    } else {
+      // Show result
+      const name = isHeads ? 'Player 1' : 'Player 2';
+      const color = isHeads ? '#A8B140' : '#6B3A22';
+      result.innerHTML =
+        `<span style="color:${color};font-weight:900">${name}</span> goes first!` +
+        `<div class="coin-sub">${isHeads ? 'Heads' : 'Tails'}!</div>`;
+      cta.style.display = '';
+    }
+  }
+  requestAnimationFrame(animate);
+}
+
+// ─── Game init ───────────────────────────────────────────────────────────────
+function initGame() {
+  S = { round: 1, turn: pendingFirstPlayer, strokes: 0, wins: [0, 0] };
+  ballPos = null; lastSafePos = null;
+  vx = 0; vy = 0;
+  ballMoving = false; gameState = 'IDLE';
+  dragStart = null; dragCurrent = null;
+  ballRotation = 0; ballDir = 0;
+  hideWin();
+  updateHUD();
+  resizeCanvas();
+  drawCourse();
+  startPhysicsLoop();
+}
+
+// ─── HUD ─────────────────────────────────────────────────────────────────────
+function updateHUD() {
+  const { round, turn, strokes, wins } = S;
+  $('roundNum').textContent   = `${round} / 5`;
+  $('strokeChip').textContent = `Strokes: ${strokes}`;
+  const isP1 = turn === 1;
+  $('turnPip').style.background = isP1 ? '#C8D15A' : '#6B3A22';
+  $('turnLabel').textContent    = isP1 ? "P1's Turn" : "P2's Turn";
+  $('hudP1').classList.toggle('dim', !isP1);
+  $('hudP2').classList.toggle('dim',  isP1);
+  ['winsP1', 'winsP2'].forEach((id, pi) =>
+    $(id).querySelectorAll('.win-pip').forEach((pip, i) =>
+      pip.classList.toggle('lit', i < wins[pi])
+    )
+  );
+}
+
+// ─── Public API for mechanics ────────────────────────────────────────────────
+window.GOLF = {
+  nextTurn() { S.turn = S.turn === 1 ? 2 : 1; S.strokes++; updateHUD(); },
+  roundWon(player) {
+    vx = 0; vy = 0; ballMoving = false; gameState = 'IDLE';
+    ballRotation = 0; ballDir = 0;
+    S.wins[player - 1]++;
+    updateHUD();
+    if (S.wins[player - 1] >= 3) {
+      setTimeout(() => showWin(player), 400);
+    } else {
+      S.round++; S.turn = player === 1 ? 2 : 1; S.strokes = 0;
+      ballPos = null; lastSafePos = null;
+      updateHUD();
+    }
+  },
+  get ballPos() { return ballPos ? { ...ballPos } : null; },
+  get layout()  { return LAYOUT; },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  CANVAS
+// ═══════════════════════════════════════════════════════════════════════════
+function resizeCanvas() {
+  const wrap = gc.parentElement;
+  gc.width  = wrap.clientWidth;
+  gc.height = wrap.clientHeight;
+}
+
+// ── Smart ball placement: sample perpendicular bisector, avoid obstacles ─────
+function isInObstacle(px, py, W, H) {
+  // Water (rotated ellipse) — include safety margin
+  const { cx, cy, rx, ry, rot } = LAYOUT.water;
+  const wcos = Math.cos(-rot), wsin = Math.sin(-rot);
+  const wdx = px - cx * W, wdy = py - cy * H;
+  const wrx = rx * W * 1.35, wry = ry * H * 1.35;
+  if (((wdx * wcos - wdy * wsin) / wrx) ** 2 +
+      ((wdx * wsin + wdy * wcos) / wry) ** 2 < 1) return true;
+
+  // Sand traps
+  for (const s of LAYOUT.sands) {
+    if (Math.hypot((px - s.cx * W) / (s.rx * W * 1.4),
+                   (py - s.cy * H) / (s.ry * H * 1.4)) < 1) return true;
+  }
+
+  // Trees
+  const tR = Math.min(W, H) * 0.055;
+  for (const t of LAYOUT.trees)
+    if (Math.hypot(px - t.x * W, py - t.y * H) < tR * t.sc) return true;
+
+  return false;
+}
+
+function findBallStart(W, H) {
+  const { h1, h2 } = LAYOUT;
+  const midX = (h1.x + h2.x) / 2 * W;
+  const midY = (h1.y + h2.y) / 2 * H;
+
+  // Perpendicular bisector direction (pixel space)
+  const dx = (h1.x - h2.x) * W, dy = (h1.y - h2.y) * H;
+  const len = Math.hypot(dx, dy);
+  const perpX = -dy / len, perpY = dx / len;
+
+  const range = Math.min(W, H) * 0.38;
+  const step  = Math.min(W, H) * 0.018;
+  const pad   = 60;
+  const minDist = Math.min(W, H) * 0.14;
+  const valid = [];
+
+  for (let t = -range; t <= range; t += step) {
+    const px = midX + t * perpX, py = midY + t * perpY;
+    if (px < pad || px > W - pad || py < pad || py > H - pad) continue;
+    if (Math.hypot(px - h1.x * W, py - h1.y * H) < minDist) continue;
+    if (Math.hypot(px - h2.x * W, py - h2.y * H) < minDist) continue;
+    if (!isInObstacle(px, py, W, H)) valid.push({ x: px, y: py });
+  }
+
+  if (valid.length > 0) return valid[Math.floor(Math.random() * valid.length)];
+
+  // Spiral fallback from midpoint
+  for (let r = step; r < range * 2; r += step) {
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 10) {
+      const px = midX + Math.cos(a) * r, py = midY + Math.sin(a) * r;
+      if (px < pad || px > W - pad || py < pad || py > H - pad) continue;
+      if (!isInObstacle(px, py, W, H)) return { x: px, y: py };
+    }
+  }
+  return { x: midX, y: midY };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  DRAWING
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Textured grass zones ─────────────────────────────────────────────────────
+function drawGrassZones(ctx, W, H) {
+  // 1. Deep rough — dark perimeter (high friction)
+  const roughG = ctx.createRadialGradient(
+    W * 0.5, H * 0.5, Math.min(W, H) * 0.25,
+    W * 0.5, H * 0.5, Math.max(W, H) * 0.80
+  );
+  roughG.addColorStop(0, '#617228');
+  roughG.addColorStop(0.55, '#4E5E1E');
+  roughG.addColorStop(1,   '#3A4614');
+  ctx.fillStyle = roughG;
+  ctx.fillRect(0, 0, W, H);
+
+  // 2. Fairway diagonal band — lighter (low friction)
+  const fwG = ctx.createLinearGradient(W * 0.10, H * 0.90, W * 0.90, H * 0.10);
+  fwG.addColorStop(0.00, 'rgba(0,0,0,0)');
+  fwG.addColorStop(0.15, 'rgba(118,138,44,0.78)');
+  fwG.addColorStop(0.50, 'rgba(140,162,50,0.90)');
+  fwG.addColorStop(0.85, 'rgba(118,138,44,0.78)');
+  fwG.addColorStop(1.00, 'rgba(0,0,0,0)');
+  ctx.fillStyle = fwG;
+  ctx.fillRect(0, 0, W, H);
+
+  // 3. Centre short-grass patch — lightest (fastest)
+  const cr = Math.min(W, H) * 0.20;
+  const cG = ctx.createRadialGradient(W * 0.49, H * 0.49, 0, W * 0.49, H * 0.49, cr);
+  cG.addColorStop(0, 'rgba(178,214,68,0.38)');
+  cG.addColorStop(1, 'rgba(178,214,68,0)');
+  ctx.fillStyle = cG;
+  ctx.fillRect(0, 0, W, H);
+
+  // 4. Mow stripes (alternating bands)
+  const sw = Math.max(28, W / 38);
+  for (let x = 0; x < W; x += sw) {
+    ctx.fillStyle = (Math.floor(x / sw) % 2 === 0)
+      ? 'rgba(255,255,255,0.030)' : 'rgba(0,0,0,0.024)';
+    ctx.fillRect(x, 0, sw, H);
+  }
+
+  // 5. Grass-blade stipple — seeded so texture is stable on every redraw
+  const rng = mkRng(0xBEEF42);
+  const blades = Math.floor(W * H / 280);
+  ctx.save();
+  ctx.lineWidth = 0.85;
+  for (let i = 0; i < blades; i++) {
+    const gx = rng() * W, gy = rng() * H;
+    // Zone: distance from centre determines rough/fairway
+    const distC = Math.hypot(gx - W * 0.49, gy - H * 0.49) / Math.min(W, H);
+    const rough  = distC > 0.34;
+    const deep   = distC > 0.46;
+    const angle  = rng() * Math.PI * 2;
+    const bLen   = deep ? (2.5 + rng() * 5.5) : rough ? (1.8 + rng() * 3.5) : (1.0 + rng() * 2.0);
+    const alpha  = deep ? (0.09 + rng() * 0.11) : rough ? (0.05 + rng() * 0.07) : (0.025 + rng() * 0.04);
+    ctx.strokeStyle = deep
+      ? `rgba(28,44,6,${alpha})`
+      : rough
+        ? `rgba(48,66,12,${alpha})`
+        : `rgba(168,210,62,${alpha})`;
+    ctx.beginPath();
+    ctx.moveTo(gx, gy);
+    ctx.lineTo(gx + Math.cos(angle) * bLen, gy + Math.sin(angle) * bLen);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ── Main course draw ─────────────────────────────────────────────────────────
+function drawCourse() {
+  const W = gc.width, H = gc.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const sc = Math.min(W, H) / 600;   // unified scale factor
+
+  drawGrassZones(ctx, W, H);
+
+  // Water
+  const { cx, cy, rx, ry, rot } = LAYOUT.water;
+  drawWater(ctx, cx * W, cy * H, rx * W, ry * H, rot);
+
+  // Sand traps
+  for (const s of LAYOUT.sands)
+    drawSand(ctx, s.cx * W, s.cy * H, s.rx * W, s.ry * H, sc);
+
+  // Trees
+  for (const t of LAYOUT.trees)
+    drawTree(ctx, t.x * W, t.y * H, t.sc * sc);
+
+  // Holes
+  drawHole(ctx, W * LAYOUT.h1.x, H * LAYOUT.h1.y, '#C8D15A', 'P1', sc);
+  drawHole(ctx, W * LAYOUT.h2.x, H * LAYOUT.h2.y, '#6B3A22', 'P2', sc);
+
+  // Ball — smart placement
+  if (!ballPos) { ballPos = findBallStart(W, H); lastSafePos = { ...ballPos }; }
+  drawBall(ctx, ballPos.x, ballPos.y, sc);
+
+  // Active-player glow ring (pulsing) when idle
+  if (gameState === 'IDLE') {
+    const glowCol = S.turn === 1 ? '#C8D15A' : '#6B3A22';
+    const pulse = 0.40 + 0.22 * Math.sin(Date.now() / 380);
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    ctx.shadowColor = glowCol; ctx.shadowBlur = 20 * sc;
+    ctx.strokeStyle = glowCol; ctx.lineWidth = 2.5 * sc;
+    ctx.beginPath(); ctx.arc(ballPos.x, ballPos.y, 19 * sc, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+
+  // Aim line + ghost trajectory while aiming
+  if (gameState === 'AIMING' && dragStart && dragCurrent) {
+    drawAimLine(ctx, W, H, sc);
+  }
+}
+
+// ── Water hazard ─────────────────────────────────────────────────────────────
+function drawWater(ctx, cx, cy, rx, ry, rot) {
+  ctx.save();
+  ctx.translate(cx, cy); ctx.rotate(rot);
+  ctx.shadowColor = '#8ECAD4'; ctx.shadowBlur = 22;
+  const wg = ctx.createLinearGradient(-rx, -ry, rx, ry);
+  wg.addColorStop(0, '#C4DCEC');
+  wg.addColorStop(0.5, '#7AAEAA');
+  wg.addColorStop(1, '#4E8E8A');
+  ctx.fillStyle = wg; ctx.globalAlpha = 0.86;
+  ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+  // Shimmer ripples
+  ctx.globalAlpha = 0.30; ctx.strokeStyle = 'rgba(255,255,255,0.60)'; ctx.lineWidth = 1.5;
+  for (let i = -1; i <= 1; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-rx * 0.62, i * ry * 0.30);
+    ctx.quadraticCurveTo(0, i * ry * 0.10, rx * 0.62, i * ry * 0.30);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ── Sand trap — granular texture ─────────────────────────────────────────────
+function drawSand(ctx, cx, cy, rx, ry, sc = 1) {
+  ctx.save(); ctx.translate(cx, cy);
+  ctx.globalAlpha = 0.80;
+  const sg = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(rx, ry));
+  sg.addColorStop(0, '#ECD89C'); sg.addColorStop(1, '#D0BC70');
+  ctx.fillStyle = sg;
+  ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+  // Granule stipple (seeded per trap using cx as seed offset)
+  const rng = mkRng((cx * 100) | 0);
+  ctx.globalAlpha = 0.38;
+  for (let i = 0; i < 55; i++) {
+    const gx = (rng() * 2 - 1) * rx * 0.82, gy = (rng() * 2 - 1) * ry * 0.82;
+    if ((gx / rx) ** 2 + (gy / ry) ** 2 > 0.92) continue;
+    const gr = (0.8 + rng() * 2.2) * sc;
+    ctx.fillStyle = rng() > 0.5 ? '#C4AA58' : '#EAD48C';
+    ctx.beginPath(); ctx.arc(gx, gy, gr, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// ── Tree ─────────────────────────────────────────────────────────────────────
+function drawTree(ctx, x, y, sc = 1) {
+  ctx.save(); ctx.translate(x, y);
+  ctx.globalAlpha = 0.18; ctx.fillStyle = '#000';
+  ctx.beginPath(); ctx.ellipse(5 * sc, 8 * sc, 18 * sc, 6 * sc, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#6B3A22';
+  ctx.fillRect(-4 * sc, -2 * sc, 8 * sc, 20 * sc);
+  [
+    { r: 24 * sc, dy:  -6 * sc, c: '#4a5a1a' },
+    { r: 22 * sc, dy: -18 * sc, c: '#5C6A24' },
+    { r: 18 * sc, dy: -29 * sc, c: '#7A8C30' },
+    { r: 13 * sc, dy: -39 * sc, c: '#8FA038' },
+  ].forEach(({ r, dy, c }) => {
+    ctx.fillStyle = c;
+    ctx.shadowColor = 'rgba(0,0,0,0.14)'; ctx.shadowBlur = 5;
+    ctx.beginPath(); ctx.arc(0, dy, r, 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.shadowBlur = 0;
+  ctx.beginPath(); ctx.arc(-5 * sc, -35 * sc, 7 * sc, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+// ── Hole with flag ───────────────────────────────────────────────────────────
+function drawHole(ctx, x, y, color, label, sc = 1) {
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = 14;
+  ctx.fillStyle = '#111';
+  ctx.beginPath(); ctx.ellipse(x, y, 16 * sc, 6 * sc, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = color; ctx.lineWidth = 3.5 * sc;
+  ctx.beginPath(); ctx.ellipse(x, y, 21 * sc, 9 * sc, 0, 0, Math.PI * 2); ctx.stroke();
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.88)'; ctx.lineWidth = 2.5 * sc; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x, y - 5 * sc); ctx.lineTo(x, y - 50 * sc); ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x,           y - 50 * sc);
+  ctx.lineTo(x + 25 * sc, y - 41 * sc);
+  ctx.lineTo(x,           y - 32 * sc);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = `bold ${Math.max(5, 7.5 * sc)}px Nunito, sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(label, x + 8 * sc, y - 41 * sc);
+  ctx.textBaseline = 'alphabetic';
+}
+
+// ── Golf ball ────────────────────────────────────────────────────────────────
+function drawBall(ctx, x, y, sc = 1) {
+  const r    = 14 * sc;
+  const spd  = Math.hypot(vx, vy);
+  const cosD = Math.cos(ballDir), sinD = Math.sin(ballDir);
+  const cosR = Math.cos(ballRotation), sinR = Math.sin(ballRotation);
+
+  ctx.save();
+
+  // ── Motion blur trail (smear behind ball proportional to speed) ───────────
+  if (spd > 3) {
+    const smear = Math.min(spd * 0.55, 14) * sc;
+    for (let t = 3; t >= 1; t--) {
+      const ox = x - cosD * smear * (t / 3);
+      const oy = y - sinD * smear * (t / 3);
+      const tg = ctx.createRadialGradient(ox, oy, 0, ox, oy, r);
+      tg.addColorStop(0, `rgba(240,240,240,${(0.10 / t).toFixed(3)})`);
+      tg.addColorStop(1, 'rgba(240,240,240,0)');
+      ctx.fillStyle = tg;
+      ctx.beginPath(); ctx.arc(ox, oy, r, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // ── Shadow ────────────────────────────────────────────────────────────────
+  ctx.globalAlpha = 0.28; ctx.fillStyle = '#000';
+  ctx.beginPath(); ctx.ellipse(x + 2*sc, y + 14*sc, 11*sc, 4*sc, 0, 0, Math.PI*2); ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // ── Ball sphere ───────────────────────────────────────────────────────────
+  const bg = ctx.createRadialGradient(x - 4*sc, y - 4*sc, 1, x, y, r);
+  bg.addColorStop(0, '#ffffff'); bg.addColorStop(0.4, '#f0f0f0'); bg.addColorStop(1, '#c8c8c8');
+  ctx.shadowColor = 'rgba(0,0,0,0.30)'; ctx.shadowBlur = 10*sc;
+  ctx.fillStyle = bg;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // ── Dimples — 3D sphere rolling projection ────────────────────────────────
+  // Each dimple lives on the sphere surface. We project it into the rolling
+  // frame (u = along movement, v = perpendicular, w = depth toward viewer),
+  // rotate in the (u, w) plane by ballRotation, then project back to screen.
+  // Only front-face dimples (w > 0) are drawn; opacity fades toward the horizon.
+  const blurElong = Math.min(spd * 0.18, 4) * sc;  // streak at high speed
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.96, 0, Math.PI*2); ctx.clip();
+
+  for (const [dx, dy] of [[4,4],[-4,6],[6,-3],[-2,-6],[2,9],[-6,-1]]) {
+    const sdx = dx*sc, sdy = dy*sc;
+    // Project into rolling frame
+    const u  =  sdx*cosD + sdy*sinD;   // component along movement
+    const v  = -sdx*sinD + sdy*cosD;   // component perpendicular to movement
+    // Z on sphere surface (positive = facing viewer)
+    const r2 = r*r, uv2 = u*u + v*v;
+    if (uv2 >= r2 * 0.95) continue;
+    const w = Math.sqrt(r2 - uv2);
+    // Apply rolling rotation in (u, w) plane — top rolls toward front
+    const u2 = u*cosR + w*sinR;
+    const w2 = -u*sinR + w*cosR;
+    if (w2 < 0) continue;   // back face — hidden
+    // Project back to 2D screen
+    const sx = u2*cosD - v*sinD;
+    const sy = u2*sinD + v*cosD;
+    // Depth-based opacity (quadratic — dimples near horizon fade out smoothly)
+    ctx.globalAlpha = 0.18 * (w2 / r) * (w2 / r);
+    ctx.fillStyle = '#111';
+    ctx.save();
+    ctx.translate(sx, sy);
+    if (blurElong > 1) {
+      // Elongate in movement direction for speed-blur effect
+      ctx.rotate(ballDir);
+      ctx.beginPath(); ctx.ellipse(0, 0, 2.2*sc + blurElong, 2.2*sc, 0, 0, Math.PI*2); ctx.fill();
+    } else {
+      ctx.beginPath(); ctx.arc(0, 0, 2.2*sc, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+  ctx.restore();
+
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  PHYSICS & INPUT
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Friction zone (math-based, matches visual grass zones) ────────────────────
+function getFriction(px, py, W, H) {
+  // Sand trap overrides first
+  for (const s of LAYOUT.sands)
+    if (Math.hypot((px - s.cx*W)/(s.rx*W), (py - s.cy*H)/(s.ry*H)) < 1) return 0.955;
+  const m = Math.min(W, H);
+  const d = Math.hypot(px - W*0.49, py - H*0.49) / m;
+  if (d < 0.18) return 0.991;   // Short-grass centre patch
+  // Fairway diagonal band (P2 bottom-left → P1 top-right)
+  const fwDx = (LAYOUT.h1.x - LAYOUT.h2.x)*W, fwDy = (LAYOUT.h1.y - LAYOUT.h2.y)*H;
+  const fwL = Math.hypot(fwDx, fwDy);
+  const perpDist = Math.abs((px - W*0.49)*(-fwDy/fwL) + (py - H*0.49)*(fwDx/fwL));
+  if (perpDist < m*0.22) return 0.985;  // Fairway
+  return d > 0.45 ? 0.970 : 0.978;     // Deep rough / semi-rough
+}
+
+// ── Water zone check ──────────────────────────────────────────────────────────
+function isInWater(px, py, W, H) {
+  const { cx, cy, rx, ry, rot } = LAYOUT.water;
+  const cos = Math.cos(-rot), sin = Math.sin(-rot);
+  const dx = px - cx*W, dy = py - cy*H;
+  return ((dx*cos - dy*sin)/(rx*W))**2 + ((dx*sin + dy*cos)/(ry*H))**2 < 1;
+}
+
+// ── Per-frame physics ─────────────────────────────────────────────────────────
+function physicsUpdate(dt) {
+  const W = gc.width, H = gc.height;
+  const sc = Math.min(W, H) / 600;
+  const ballR      = 14 * sc;
+  const treeBaseR  = TREE_COLLIDE_FRAC * Math.min(W, H);
+  const holeR      = HOLE_TRIGGER_FRAC * Math.min(W, H);
+  const steps      = Math.max(1, Math.round(Math.min(dt, 50) / 16.67));
+
+  for (let s = 0; s < steps; s++) {
+    // Track last safe position before each move
+    if (!isInWater(ballPos.x, ballPos.y, W, H))
+      lastSafePos = { x: ballPos.x, y: ballPos.y };
+
+    // Friction + move
+    const f = getFriction(ballPos.x, ballPos.y, W, H);
+    vx *= f; vy *= f;
+    ballPos.x += vx; ballPos.y += vy;
+    const spd = Math.hypot(vx, vy);
+    if (spd > 0.5) ballDir = Math.atan2(vy, vx);
+    ballRotation = (ballRotation + spd / (14 * sc)) % (Math.PI * 2);
+
+    // Wall bounce
+    if (ballPos.x - ballR < 0)    { ballPos.x = ballR;     vx =  Math.abs(vx) * WALL_BOUNCE; }
+    if (ballPos.x + ballR > W)    { ballPos.x = W - ballR; vx = -Math.abs(vx) * WALL_BOUNCE; }
+    if (ballPos.y - ballR < 0)    { ballPos.y = ballR;     vy =  Math.abs(vy) * WALL_BOUNCE; }
+    if (ballPos.y + ballR > H)    { ballPos.y = H - ballR; vy = -Math.abs(vy) * WALL_BOUNCE; }
+
+    // Tree bounce (reflect velocity off surface normal)
+    for (const t of LAYOUT.trees) {
+      const tx = t.x*W, ty = t.y*H, tR = treeBaseR*t.sc + ballR;
+      const dx = ballPos.x - tx, dy = ballPos.y - ty;
+      const dist = Math.hypot(dx, dy);
+      if (dist < tR && dist > 0.001) {
+        const nx = dx/dist, ny = dy/dist;
+        const dot = vx*nx + vy*ny;
+        if (dot < 0) {
+          vx = (vx - 2*dot*nx) * TREE_BOUNCE;
+          vy = (vy - 2*dot*ny) * TREE_BOUNCE;
+        }
+        // Push ball to collision surface
+        ballPos.x = tx + nx*tR; ballPos.y = ty + ny*tR;
+      }
+    }
+
+    // Water → reset to last safe + end turn
+    if (isInWater(ballPos.x, ballPos.y, W, H)) {
+      ballPos = { ...lastSafePos };
+      vx = 0; vy = 0; ballMoving = false; gameState = 'IDLE';
+      GOLF.nextTurn(); return;
+    }
+  }
+
+  // Hole capture (after all sub-steps)
+  const speed = Math.hypot(vx, vy);
+  const h1x = W*LAYOUT.h1.x, h1y = H*LAYOUT.h1.y;
+  const h2x = W*LAYOUT.h2.x, h2y = H*LAYOUT.h2.y;
+  if (Math.hypot(ballPos.x-h1x, ballPos.y-h1y) < holeR)
+    return handleHoleSink(1);
+  if (Math.hypot(ballPos.x-h2x, ballPos.y-h2y) < holeR)
+    return handleHoleSink(2);
+
+  // Ball stopped
+  if (speed < STOP_THRESHOLD) {
+    vx = 0; vy = 0; ballMoving = false; gameState = 'IDLE';
+    GOLF.nextTurn();
+  }
+}
+
+function handleHoleSink(holeOwner) {
+  vx = 0; vy = 0; ballMoving = false; gameState = 'IDLE';
+  // Hole owner always wins the round (wrong hole gives point to the hole's owner)
+  GOLF.roundWon(holeOwner);
+}
+
+// ── RAF loop (always running while game screen is active) ─────────────────────
+function startPhysicsLoop() {
+  if (rafId) cancelAnimationFrame(rafId);
+  lastTS = 0;
+  function loop(ts) {
+    if (!lastTS) lastTS = ts;
+    const dt = ts - lastTS; lastTS = ts;
+    if (ballMoving) physicsUpdate(dt);
+    drawCourse();
+    rafId = requestAnimationFrame(loop);
+  }
+  rafId = requestAnimationFrame(loop);
+}
+
+// ── Canvas coordinate helper (handles CSS scaling) ────────────────────────────
+function getCanvasPos(e) {
+  const rect = gc.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left) * gc.width  / rect.width,
+    y: (e.clientY - rect.top)  * gc.height / rect.height,
+  };
+}
+
+// ── Pointer input ─────────────────────────────────────────────────────────────
+function onPointerDown(e) {
+  if (gameState !== 'IDLE' || !ballPos) return;
+  const pos = getCanvasPos(e);
+  const sc  = Math.min(gc.width, gc.height) / 600;
+  // Allow click within 2.8× ball radius (generous touch target)
+  if (Math.hypot(pos.x - ballPos.x, pos.y - ballPos.y) > 40 * sc) return;
+  e.preventDefault();
+  gc.setPointerCapture(e.pointerId);
+  gameState = 'AIMING'; dragStart = pos; dragCurrent = pos;
+}
+
+function onPointerMove(e) {
+  if (gameState !== 'AIMING') return;
+  e.preventDefault(); dragCurrent = getCanvasPos(e);
+}
+
+function onPointerUp(e) {
+  if (gameState !== 'AIMING') return;
+  e.preventDefault();
+  const dx = dragStart.x - dragCurrent.x, dy = dragStart.y - dragCurrent.y;
+  const dragDist = Math.min(Math.hypot(dx, dy), MAX_DRAG_DISTANCE);
+  if (dragDist >= MIN_SHOOT_POWER) {
+    const angle = Math.atan2(dy, dx), power = dragDist * POWER_MULTIPLIER;
+    vx = Math.cos(angle) * power;
+    vy = Math.sin(angle) * power;
+    lastSafePos  = { ...ballPos };
+    ballMoving   = true;
+    gameState    = 'BALL_MOVING';
+  } else {
+    gameState = 'IDLE';
+  }
+  dragStart = null; dragCurrent = null;
+}
+
+// ── Aim line + power indicator ────────────────────────────────────────────────
+function drawAimLine(ctx, W, H, sc) {
+  const dx = dragStart.x - dragCurrent.x, dy = dragStart.y - dragCurrent.y;
+  const dragDist = Math.min(Math.hypot(dx, dy), MAX_DRAG_DISTANCE);
+  if (dragDist < MIN_SHOOT_POWER) return;
+
+  const angle = Math.atan2(dy, dx);
+  const power = dragDist * POWER_MULTIPLIER;
+  const t  = dragDist / MAX_DRAG_DISTANCE;       // 0..1 power ratio
+  const cr = Math.round(t * 240), cg = Math.round((1-t) * 200 + 55);
+
+  ctx.save();
+
+  // Drag feedback line (ball → cursor)
+  ctx.strokeStyle = `rgba(${cr},${cg},30,0.28)`;
+  ctx.lineWidth = 2 * sc; ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(ballPos.x, ballPos.y);
+  ctx.lineTo(dragCurrent.x, dragCurrent.y); ctx.stroke();
+
+  // Max-drag radius circle
+  ctx.setLineDash([5*sc, 5*sc]);
+  ctx.strokeStyle = `rgba(${cr},${cg},30,0.16)`;
+  ctx.lineWidth = 1.5 * sc;
+  ctx.beginPath(); ctx.arc(dragStart.x, dragStart.y, MAX_DRAG_DISTANCE, 0, Math.PI*2);
+  ctx.stroke(); ctx.setLineDash([]);
+
+  // Ghost trajectory (faint dots showing ball path)
+  drawGhostTrajectory(ctx, W, H, sc, Math.cos(angle)*power, Math.sin(angle)*power, cr, cg);
+
+  // Aim dots in shot direction (bright, fading out)
+  const aimLen = Math.min(dragDist * 1.8, W * 0.38);
+  for (let i = 1; i <= 18; i++) {
+    const frac = i / 18;
+    ctx.globalAlpha = (1 - frac * 0.55) * 0.92;
+    ctx.fillStyle = `rgb(${cr},${cg},30)`;
+    ctx.beginPath();
+    ctx.arc(
+      ballPos.x + Math.cos(angle) * aimLen * frac,
+      ballPos.y + Math.sin(angle) * aimLen * frac,
+      (3.5 - frac*1.5) * sc, 0, Math.PI*2
+    );
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+// ── Ghost trajectory (dotted arc, max 1 bounce predicted) ────────────────────
+function drawGhostTrajectory(ctx, W, H, sc, svx, svy, cr, cg) {
+  let gx = ballPos.x, gy = ballPos.y, gvx = svx, gvy = svy;
+  const ballR = 14*sc, treeBaseR = TREE_COLLIDE_FRAC * Math.min(W, H);
+  let bounces = 0;
+
+  ctx.fillStyle = `rgb(${cr},${cg},30)`;
+  for (let i = 0; i < 100; i++) {
+    gvx *= 0.985; gvy *= 0.985;
+    gx += gvx; gy += gvy;
+
+    // Wall bounces
+    if (gx-ballR<0)  { gx=ballR;   gvx= Math.abs(gvx)*WALL_BOUNCE; bounces++; }
+    if (gx+ballR>W)  { gx=W-ballR; gvx=-Math.abs(gvx)*WALL_BOUNCE; bounces++; }
+    if (gy-ballR<0)  { gy=ballR;   gvy= Math.abs(gvy)*WALL_BOUNCE; bounces++; }
+    if (gy+ballR>H)  { gy=H-ballR; gvy=-Math.abs(gvy)*WALL_BOUNCE; bounces++; }
+
+    // Tree bounces
+    for (const t of LAYOUT.trees) {
+      const tx=t.x*W, ty=t.y*H, tR=treeBaseR*t.sc+ballR;
+      const ddx=gx-tx, ddy=gy-ty, dist=Math.hypot(ddx, ddy);
+      if (dist < tR && dist > 0.001) {
+        const nx=ddx/dist, ny=ddy/dist, dot=gvx*nx+gvy*ny;
+        if (dot < 0) { gvx=(gvx-2*dot*nx)*TREE_BOUNCE; gvy=(gvy-2*dot*ny)*TREE_BOUNCE; }
+        gx=tx+nx*tR; gy=ty+ny*tR; bounces++;
+      }
+    }
+
+    if (bounces > 1 || Math.hypot(gvx, gvy) < STOP_THRESHOLD) break;
+
+    if (i % 3 === 0) {
+      ctx.globalAlpha = 0.16 * (1 - i / 100);
+      ctx.beginPath(); ctx.arc(gx, gy, 2.5*sc, 0, Math.PI*2); ctx.fill();
+    }
+  }
+}
+
+// ─── Events ──────────────────────────────────────────────────────────────────
+$('btnPlay').addEventListener('click', showGame);
+$('btnHow').addEventListener('click', showHTP);
+$('htpClose').addEventListener('click', hideHTP);
+$('htpOverlay').addEventListener('click', e => { if (e.target === $('htpOverlay')) hideHTP(); });
+$('btnQuit').addEventListener('click', () => { hideWin(); showMenu(); });
+$('btnPlayAgain').addEventListener('click', () => { hideWin(); showCoinFlip(); });
+$('coinCta').addEventListener('click', () => { $('coinOverlay').classList.remove('show'); initGame(); });
+$('btnMenu').addEventListener('click', () => { hideWin(); showMenu(); });
+
+gc.addEventListener('pointerdown',   onPointerDown,  { passive: false });
+gc.addEventListener('pointermove',   onPointerMove,  { passive: false });
+gc.addEventListener('pointerup',     onPointerUp,    { passive: false });
+gc.addEventListener('pointercancel', onPointerUp,    { passive: false });
+
+window.addEventListener('resize', () => {
+  if (!game.classList.contains('hidden')) {
+    vx = 0; vy = 0; ballMoving = false; gameState = 'IDLE';
+    dragStart = null; dragCurrent = null;
+    ballPos = null; lastSafePos = null;
+    resizeCanvas();
+  }
+});
+</script>
+
+</body>
+</html>
