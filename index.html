@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mini Golf 1v1</title>
+  <title>Goofy Golf Battle!</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
@@ -564,8 +564,8 @@
 
     <!-- Title -->
     <div class="title-wrap">
-      <h1 class="game-title">MINI GOLF</h1>
-      <p class="game-sub">1v1 Challenge</p>
+      <h1 class="game-title">GOOFY GOLF</h1>
+      <p class="game-sub">Battle!</p>
     </div>
 
     <!-- CTA Buttons -->
@@ -735,22 +735,67 @@ const menu = $('menu'), game = $('game');
 const gc   = $('gc'), ctx = gc.getContext('2d');
 
 // ─── Course layout (all positions are 0..1 fractions of W / H) ──────────────
-const LAYOUT = {
-  h1:    { x: 0.80, y: 0.18 },   // P1 hole — top-right
-  h2:    { x: 0.18, y: 0.80 },   // P2 hole — bottom-left
-  water: { cx: 0.46, cy: 0.50, rx: 0.064, ry: 0.082, rot: -0.2 },
-  sands: [
-    { cx: 0.64, cy: 0.74, rx: 0.037, ry: 0.048 },
-    { cx: 0.28, cy: 0.32, rx: 0.029, ry: 0.038 },
-  ],
-  trees: [
-    { x: 0.28, y: 0.26, sc: 1.00 },
-    { x: 0.70, y: 0.36, sc: 0.88 },
-    { x: 0.54, y: 0.20, sc: 0.74 },
-    { x: 0.36, y: 0.68, sc: 0.92 },
-    { x: 0.76, y: 0.68, sc: 0.78 },
-  ],
-};
+// Holes are always fixed at opposite corners
+const H1 = { x: 0.80, y: 0.18 };
+const H2 = { x: 0.18, y: 0.80 };
+
+function generateLayout(seed) {
+  const rng = mkRng(seed >>> 0);
+
+  function nearHole(x, y, margin) {
+    return Math.hypot(x - H1.x, y - H1.y) < margin ||
+           Math.hypot(x - H2.x, y - H2.y) < margin;
+  }
+
+  // Water hazard — random position in mid-field, away from holes
+  let wx, wy, wa = 0;
+  do { wx = 0.26 + rng() * 0.48; wy = 0.26 + rng() * 0.48; wa++; }
+  while (wa < 40 && nearHole(wx, wy, 0.24));
+  const water = {
+    cx: wx, cy: wy,
+    rx: 0.040 + rng() * 0.038,
+    ry: 0.050 + rng() * 0.044,
+    rot: (rng() - 0.5) * 1.6,
+  };
+
+  // Sand traps — 1 to 3
+  const numSands = 1 + Math.floor(rng() * 3);
+  const sands = [];
+  for (let i = 0; i < numSands; i++) {
+    let sx, sy, sa = 0;
+    do {
+      sx = 0.12 + rng() * 0.76; sy = 0.12 + rng() * 0.76; sa++;
+    } while (sa < 30 && (
+      nearHole(sx, sy, 0.15) ||
+      Math.hypot(sx - water.cx, sy - water.cy) < 0.16 ||
+      sands.some(s => Math.hypot(sx - s.cx, sy - s.cy) < 0.13)
+    ));
+    if (sa < 30) sands.push({
+      cx: sx, cy: sy,
+      rx: 0.022 + rng() * 0.024,
+      ry: 0.028 + rng() * 0.028,
+    });
+  }
+
+  // Trees — 3 to 7
+  const numTrees = 3 + Math.floor(rng() * 5);
+  const trees = [];
+  for (let i = 0; i < numTrees; i++) {
+    let tx, ty, ta = 0;
+    do {
+      tx = 0.10 + rng() * 0.80; ty = 0.10 + rng() * 0.80; ta++;
+    } while (ta < 30 && (
+      nearHole(tx, ty, 0.14) ||
+      Math.hypot(tx - water.cx, ty - water.cy) < 0.13 ||
+      trees.some(t => Math.hypot(tx - t.x, ty - t.y) < 0.10)
+    ));
+    if (ta < 30) trees.push({ x: tx, y: ty, sc: 0.65 + rng() * 0.42 });
+  }
+
+  return { h1: H1, h2: H2, water, sands, trees };
+}
+
+let LAYOUT = generateLayout(0x600F7B47);  // stable first-round layout
 
 // ─── Physics constants ────────────────────────────────────────────────────────
 const MAX_DRAG_DISTANCE  = 120;
@@ -863,6 +908,7 @@ function flipCoin() {
 // ─── Game init ───────────────────────────────────────────────────────────────
 function initGame() {
   S = { round: 1, turn: pendingFirstPlayer, strokes: 0, wins: [0, 0] };
+  LAYOUT = generateLayout(Date.now());
   ballPos = null; lastSafePos = null;
   vx = 0; vy = 0;
   ballMoving = false; gameState = 'IDLE';
@@ -904,6 +950,7 @@ window.GOLF = {
       setTimeout(() => showWin(player), 400);
     } else {
       S.round++; S.turn = player === 1 ? 2 : 1; S.strokes = 0;
+      LAYOUT = generateLayout(Date.now());
       ballPos = null; lastSafePos = null;
       updateHUD();
     }
