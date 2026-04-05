@@ -399,6 +399,24 @@
     .modal-cta:hover { box-shadow: 0 8px 0 var(--olive-dk), 0 14px 24px rgba(92,106,36,0.28); }
     .modal-cta:active { box-shadow: 0 2px 0 var(--olive-dk) !important; }
 
+    /* ── Penalty / terrain toast ── */
+    .penalty-toast {
+      position: fixed; top: 42%; left: 50%;
+      transform: translate(-50%, -50%) scale(0.85);
+      background: rgba(160, 30, 30, 0.93);
+      color: #fff; padding: 14px 30px; border-radius: 14px;
+      font-family: 'Fredoka One', cursive;
+      font-size: clamp(15px, 2.8vw, 22px);
+      text-align: center; pointer-events: none;
+      opacity: 0; transition: opacity 0.22s, transform 0.22s;
+      z-index: 600; white-space: nowrap;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+    }
+    .penalty-toast.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
     /* ── Win screen overlay ── */
     .win-overlay {
       position: fixed; inset: 0; z-index: 400;
@@ -645,6 +663,8 @@
 
 </div><!-- /#game -->
 
+<!-- Penalty / terrain toast -->
+<div id="penaltyToast" class="penalty-toast"></div>
 
 <!-- ════════════════════════════════════
      HOW TO PLAY MODAL
@@ -825,6 +845,11 @@ let rafId         = null;
 let lastTS        = 0;
 let ballRotation  = 0;   // accumulated roll angle (radians)
 let ballDir       = 0;   // movement direction angle (radians)
+
+// ─── Terrain / penalty state ──────────────────────────────────────────────────
+let penaltyTurns = 0;    // extra consecutive turns for the CURRENT player (post-switch)
+let splashAnim   = null; // { x, y, startTime } water splash ripple
+const SAND_LIP_SPEED = 3.5; // px/frame — ball must exceed this to escape sand
 
 // ─── Seeded RNG (Mulberry32) — stable texture across redraws ─────────────────
 function mkRng(seed) {
@@ -1049,6 +1074,7 @@ function initGame() {
   ballMoving = false; gameState = 'IDLE';
   dragStart = null; dragCurrent = null;
   ballRotation = 0; ballDir = 0;
+  penaltyTurns = 0; splashAnim = null;
   hideWin();
   updateHUD();
   resizeCanvas();
@@ -1075,7 +1101,23 @@ function updateHUD() {
 
 // ─── Public API for mechanics ────────────────────────────────────────────────
 window.GOLF = {
-  nextTurn() { S.turn = S.turn === 1 ? 2 : 1; S.strokes++; updateHUD(); },
+  nextTurn() {
+    if (penaltyTurns > 0) {
+      // Current player keeps their turn (bonus shot from water penalty)
+      penaltyTurns--;
+    } else {
+      S.turn = S.turn === 1 ? 2 : 1;
+    }
+    S.strokes++; updateHUD();
+  },
+  waterPenalty(victim) {
+    // Opponent gets 2 consecutive shots total (1 normal + 1 bonus)
+    const opponent = victim === 1 ? 2 : 1;
+    S.turn = opponent;
+    penaltyTurns = 1;
+    S.strokes++; updateHUD();
+    showPenaltyToast(opponent);
+  },
   roundWon(player) {
     vx = 0; vy = 0; ballMoving = false; gameState = 'IDLE';
     ballRotation = 0; ballDir = 0;
@@ -1087,6 +1129,7 @@ window.GOLF = {
       S.round++; S.turn = player === 1 ? 2 : 1; S.strokes = 0;
       LAYOUT = generateLayout(Date.now());
       ballPos = null; lastSafePos = null;
+      penaltyTurns = 0; splashAnim = null;
       updateHUD();
     }
   },
@@ -1273,6 +1316,41 @@ function drawCourse() {
     ctx.strokeStyle = glowCol; ctx.lineWidth = 2.5 * sc;
     ctx.beginPath(); ctx.arc(ballPos.x, ballPos.y, 19 * sc, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
+  }
+
+  // Water splash ripple animation
+  if (splashAnim) {
+    const elapsed = Date.now() - splashAnim.startTime;
+    const dur = 900;
+    if (elapsed < dur) {
+      const p = elapsed / dur;
+      const maxR = Math.min(W, H) * 0.07;
+      ctx.save();
+      for (let i = 0; i < 3; i++) {
+        const ip = Math.max(0, p * 1.6 - i * 0.35);
+        if (ip <= 0) continue;
+        const r = maxR * Math.min(ip, 1);
+        ctx.globalAlpha = (1 - ip) * 0.75;
+        ctx.strokeStyle = '#a8e4ff';
+        ctx.lineWidth   = (3 - i * 0.8) * sc;
+        ctx.beginPath(); ctx.arc(splashAnim.x, splashAnim.y, r, 0, Math.PI * 2); ctx.stroke();
+      }
+      // Droplet dots
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        const dp = Math.min(1, p * 2.5);
+        const dr = maxR * 0.55 * dp;
+        const dy2 = dp * dp * maxR * 0.5;
+        ctx.globalAlpha = (1 - dp) * 0.85;
+        ctx.fillStyle = '#c8eeff';
+        ctx.beginPath();
+        ctx.arc(splashAnim.x + Math.cos(a) * dr, splashAnim.y + Math.sin(a) * dr - dy2, 3 * sc * (1 - dp), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    } else {
+      splashAnim = null;
+    }
   }
 
   // Aim line + ghost trajectory while aiming
@@ -1482,6 +1560,35 @@ function isInWater(px, py, W, H) {
   return ((dx*cos - dy*sin)/(rx*W))**2 + ((dx*sin + dy*cos)/(ry*H))**2 < 1;
 }
 
+// ── Sand zone check ───────────────────────────────────────────────────────────
+function isInSand(px, py, W, H) {
+  for (const s of LAYOUT.sands)
+    if (Math.hypot((px - s.cx*W)/(s.rx*W), (py - s.cy*H)/(s.ry*H)) < 1) return true;
+  return false;
+}
+
+// ── Terrain at ball position (for shot modifiers) ─────────────────────────────
+function getTerrainAt(px, py, W, H) {
+  if (isInSand(px, py, W, H)) return 'sand';
+  if (isInWater(px, py, W, H)) return 'water';
+  const m = Math.min(W, H);
+  const d = Math.hypot(px - W*0.49, py - H*0.49) / m;
+  if (d < 0.18) return 'fairway';
+  const fwDx = (LAYOUT.h1.x - LAYOUT.h2.x)*W, fwDy = (LAYOUT.h1.y - LAYOUT.h2.y)*H;
+  const fwL  = Math.hypot(fwDx, fwDy);
+  const perp = Math.abs((px - W*0.49)*(-fwDy/fwL) + (py - H*0.49)*(fwDx/fwL));
+  if (perp < m*0.22) return 'fairway';
+  return 'rough';
+}
+
+// ── Water penalty toast ───────────────────────────────────────────────────────
+function showPenaltyToast(shooterPlayer) {
+  const el = document.getElementById('penaltyToast');
+  el.textContent = `💦 Water! Player ${shooterPlayer} shoots twice!`;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2800);
+}
+
 // ── Per-frame physics ─────────────────────────────────────────────────────────
 function physicsUpdate(dt) {
   const W = gc.width, H = gc.height;
@@ -1497,6 +1604,9 @@ function physicsUpdate(dt) {
     // Track last safe position before each move
     if (!isInWater(ballPos.x, ballPos.y, W, H))
       lastSafePos = { x: ballPos.x, y: ballPos.y };
+
+    const prevX = ballPos.x, prevY = ballPos.y;
+    const wasInSand = isInSand(prevX, prevY, W, H);
 
     // Friction + move
     const f = getFriction(ballPos.x, ballPos.y, W, H);
@@ -1529,11 +1639,18 @@ function physicsUpdate(dt) {
       }
     }
 
-    // Water → reset to last safe + end turn
+    // Sand lip wall — ball can't slowly roll out of a bunker
+    if (wasInSand && !isInSand(ballPos.x, ballPos.y, W, H) && Math.hypot(vx, vy) < SAND_LIP_SPEED) {
+      ballPos.x = prevX; ballPos.y = prevY;
+      vx *= 0.12; vy *= 0.12;
+    }
+
+    // Water → reset to last safe + give opponent 2 consecutive shots
     if (isInWater(ballPos.x, ballPos.y, W, H)) {
+      splashAnim = { x: ballPos.x, y: ballPos.y, startTime: Date.now() };
       ballPos = { ...lastSafePos };
       vx = 0; vy = 0; ballMoving = false; gameState = 'IDLE';
-      GOLF.nextTurn(); return;
+      GOLF.waterPenalty(S.turn); return;
     }
 
     // Hole capture — checked each substep so fast balls don't skip through
@@ -1606,7 +1723,17 @@ function onPointerUp(e) {
   const dragDist = Math.min(Math.hypot(dx, dy), MAX_DRAG_DISTANCE);
   if (dragDist >= MIN_SHOOT_POWER) {
     playSwing(dragDist / MAX_DRAG_DISTANCE * 100);
-    const angle = Math.atan2(dy, dx), power = dragDist * POWER_MULTIPLIER;
+    const W = gc.width, H = gc.height;
+    const terrain = getTerrainAt(ballPos.x, ballPos.y, W, H);
+    let angle = Math.atan2(dy, dx);
+    let power = dragDist * POWER_MULTIPLIER;
+    if (terrain === 'rough') {
+      power *= 0.75 + Math.random() * 0.10;                              // 75–85%
+      angle += (Math.random() * 2 - 1) * (8 + Math.random() * 4) * Math.PI / 180; // ±8–12°
+    } else if (terrain === 'sand') {
+      power *= 0.50 + Math.random() * 0.15;                              // 50–65%
+      angle += (Math.random() * 2 - 1) * (10 + Math.random() * 10) * Math.PI / 180; // ±10–20°
+    }
     vx = Math.cos(angle) * power;
     vy = Math.sin(angle) * power;
     lastSafePos  = { ...ballPos };
@@ -1660,6 +1787,23 @@ function drawAimLine(ctx, W, H, sc) {
       (3.5 - frac*1.5) * sc, 0, Math.PI*2
     );
     ctx.fill();
+  }
+
+  // Terrain warning label (rough / sand)
+  const terrain = getTerrainAt(ballPos.x, ballPos.y, W, H);
+  if (terrain === 'rough' || terrain === 'sand') {
+    const label  = terrain === 'sand' ? '⛱ Sand — 50–65% power, ±20° wobble' : '🌿 Rough — 75–85% power, ±12° wobble';
+    const col    = terrain === 'sand' ? '#c8a028' : '#5a7a22';
+    const fs     = Math.max(11, 13 * sc);
+    ctx.save();
+    ctx.font         = `bold ${fs}px Nunito, sans-serif`;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillStyle    = 'rgba(0,0,0,0.45)';
+    ctx.fillText(label, ballPos.x + 1, ballPos.y - 26 * sc + 1);
+    ctx.fillStyle = col;
+    ctx.fillText(label, ballPos.x, ballPos.y - 26 * sc);
+    ctx.restore();
   }
 
   ctx.restore();
