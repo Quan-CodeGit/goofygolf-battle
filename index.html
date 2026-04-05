@@ -813,7 +813,24 @@ function generateLayout(seed) {
     if (ta < 30) trees.push({ x: tx, y: ty, sc: 0.65 + rng() * 0.42 });
   }
 
-  return { h1, h2, water, sands, trees };
+  // Fairway blobs — 2 or 3 organic round shapes connecting the two holes
+  const nbFw = rng() > 0.4 ? 3 : 2;
+  const fairway = [];
+  for (let i = 0; i < nbFw; i++) {
+    const t  = nbFw === 1 ? 0.5 : i / (nbFw - 1);
+    const cx = h2.x + (h1.x - h2.x) * t + (rng() - 0.5) * 0.12;
+    const cy = h2.y + (h1.y - h2.y) * t + (rng() - 0.5) * 0.12;
+    const isEnd = (i === 0 || i === nbFw - 1);
+    const base  = isEnd ? (0.16 + rng() * 0.08) : (0.13 + rng() * 0.09);
+    fairway.push({
+      cx: Math.max(0.08, Math.min(0.92, cx)),
+      cy: Math.max(0.08, Math.min(0.92, cy)),
+      rx: base * (0.80 + rng() * 0.38),
+      ry: base * (0.70 + rng() * 0.44),
+    });
+  }
+
+  return { h1, h2, water, sands, trees, fairway };
 }
 
 let LAYOUT = generateLayout(0x600F7B47);  // stable first-round layout
@@ -1213,62 +1230,59 @@ function findBallStart(W, H) {
 
 // ── Textured grass zones ─────────────────────────────────────────────────────
 function drawGrassZones(ctx, W, H) {
-  // 1. Deep rough — dark perimeter (high friction)
+  // 1. Rough background — dark, covers whole canvas
   const roughG = ctx.createRadialGradient(
-    W * 0.5, H * 0.5, Math.min(W, H) * 0.25,
-    W * 0.5, H * 0.5, Math.max(W, H) * 0.80
+    W * 0.5, H * 0.5, Math.min(W, H) * 0.15,
+    W * 0.5, H * 0.5, Math.max(W, H) * 0.82
   );
-  roughG.addColorStop(0, '#617228');
-  roughG.addColorStop(0.55, '#4E5E1E');
-  roughG.addColorStop(1,   '#3A4614');
+  roughG.addColorStop(0,    '#536222');
+  roughG.addColorStop(0.45, '#485A1C');
+  roughG.addColorStop(1,    '#384512');
   ctx.fillStyle = roughG;
   ctx.fillRect(0, 0, W, H);
 
-  // 2. Fairway diagonal band — lighter (low friction)
-  const fwG = ctx.createLinearGradient(W * 0.10, H * 0.90, W * 0.90, H * 0.10);
-  fwG.addColorStop(0.00, 'rgba(0,0,0,0)');
-  fwG.addColorStop(0.15, 'rgba(118,138,44,0.78)');
-  fwG.addColorStop(0.50, 'rgba(140,162,50,0.90)');
-  fwG.addColorStop(0.85, 'rgba(118,138,44,0.78)');
-  fwG.addColorStop(1.00, 'rgba(0,0,0,0)');
-  ctx.fillStyle = fwG;
-  ctx.fillRect(0, 0, W, H);
+  // 2. Fairway blobs — organic round shapes (randomised each round)
+  for (const b of LAYOUT.fairway) {
+    const cx  = b.cx * W, cy = b.cy * H;
+    const rx  = b.rx * W, ry = b.ry * H;
+    const maxR = Math.sqrt(rx * rx + ry * ry) * 0.78;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(rx / maxR, ry / maxR);
+    const fg = ctx.createRadialGradient(0, 0, 0, 0, 0, maxR * 1.18);
+    fg.addColorStop(0,    'rgba(156, 196, 56, 0.95)');
+    fg.addColorStop(0.50, 'rgba(136, 170, 46, 0.88)');
+    fg.addColorStop(0.78, 'rgba(112, 142, 36, 0.58)');
+    fg.addColorStop(1.0,  'rgba(88, 114, 28, 0)');
+    ctx.fillStyle = fg;
+    ctx.beginPath();
+    ctx.arc(0, 0, maxR * 1.18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
 
-  // 3. Centre short-grass patch — lightest (fastest)
-  const cr = Math.min(W, H) * 0.20;
-  const cG = ctx.createRadialGradient(W * 0.49, H * 0.49, 0, W * 0.49, H * 0.49, cr);
-  cG.addColorStop(0, 'rgba(178,214,68,0.38)');
-  cG.addColorStop(1, 'rgba(178,214,68,0)');
-  ctx.fillStyle = cG;
-  ctx.fillRect(0, 0, W, H);
-
-  // 4. Mow stripes (alternating bands)
+  // 3. Mow stripes — subtle alternating light/dark bands
   const sw = Math.max(28, W / 38);
   for (let x = 0; x < W; x += sw) {
     ctx.fillStyle = (Math.floor(x / sw) % 2 === 0)
-      ? 'rgba(255,255,255,0.030)' : 'rgba(0,0,0,0.024)';
+      ? 'rgba(255,255,255,0.026)' : 'rgba(0,0,0,0.020)';
     ctx.fillRect(x, 0, sw, H);
   }
 
-  // 5. Grass-blade stipple — seeded so texture is stable on every redraw
+  // 4. Grass-blade stipple — seeded positions, fairway vs rough colour
   const rng = mkRng(0xBEEF42);
   const blades = Math.floor(W * H / 280);
   ctx.save();
   ctx.lineWidth = 0.85;
   for (let i = 0; i < blades; i++) {
     const gx = rng() * W, gy = rng() * H;
-    // Zone: distance from centre determines rough/fairway
-    const distC = Math.hypot(gx - W * 0.49, gy - H * 0.49) / Math.min(W, H);
-    const rough  = distC > 0.34;
-    const deep   = distC > 0.46;
-    const angle  = rng() * Math.PI * 2;
-    const bLen   = deep ? (2.5 + rng() * 5.5) : rough ? (1.8 + rng() * 3.5) : (1.0 + rng() * 2.0);
-    const alpha  = deep ? (0.09 + rng() * 0.11) : rough ? (0.05 + rng() * 0.07) : (0.025 + rng() * 0.04);
-    ctx.strokeStyle = deep
-      ? `rgba(28,44,6,${alpha})`
-      : rough
-        ? `rgba(48,66,12,${alpha})`
-        : `rgba(168,210,62,${alpha})`;
+    const inFw = isInFairway(gx, gy, W, H);
+    const angle = rng() * Math.PI * 2;
+    const bLen  = inFw ? (1.0 + rng() * 2.0) : (2.4 + rng() * 5.0);
+    const alpha = inFw ? (0.025 + rng() * 0.04) : (0.07 + rng() * 0.10);
+    ctx.strokeStyle = inFw
+      ? `rgba(168,210,62,${alpha})`
+      : `rgba(28,44,6,${alpha})`;
     ctx.beginPath();
     ctx.moveTo(gx, gy);
     ctx.lineTo(gx + Math.cos(angle) * bLen, gy + Math.sin(angle) * bLen);
@@ -1536,20 +1550,11 @@ function drawBall(ctx, x, y, sc = 1) {
 //  PHYSICS & INPUT
 // ═══════════════════════════════════════════════════════════════════════════
 
-// ── Friction zone (math-based, matches visual grass zones) ────────────────────
+// ── Friction zone — matches visual terrain blobs ──────────────────────────────
 function getFriction(px, py, W, H) {
-  // Sand trap overrides first
-  for (const s of LAYOUT.sands)
-    if (Math.hypot((px - s.cx*W)/(s.rx*W), (py - s.cy*H)/(s.ry*H)) < 1) return 0.955;
-  const m = Math.min(W, H);
-  const d = Math.hypot(px - W*0.49, py - H*0.49) / m;
-  if (d < 0.18) return 0.991;   // Short-grass centre patch
-  // Fairway diagonal band (P2 bottom-left → P1 top-right)
-  const fwDx = (LAYOUT.h1.x - LAYOUT.h2.x)*W, fwDy = (LAYOUT.h1.y - LAYOUT.h2.y)*H;
-  const fwL = Math.hypot(fwDx, fwDy);
-  const perpDist = Math.abs((px - W*0.49)*(-fwDy/fwL) + (py - H*0.49)*(fwDx/fwL));
-  if (perpDist < m*0.22) return 0.985;  // Fairway
-  return d > 0.45 ? 0.970 : 0.978;     // Deep rough / semi-rough
+  if (isInSand(px, py, W, H))    return 0.955;  // sand: high friction, ball stops fast
+  if (isInFairway(px, py, W, H)) return 0.988;  // fairway: smooth, low friction
+  return 0.972;                                  // rough: noticeably slower
 }
 
 // ── Water zone check ──────────────────────────────────────────────────────────
@@ -1567,17 +1572,18 @@ function isInSand(px, py, W, H) {
   return false;
 }
 
+// ── Fairway blob check ────────────────────────────────────────────────────────
+function isInFairway(px, py, W, H) {
+  for (const b of LAYOUT.fairway)
+    if (((px - b.cx*W)/(b.rx*W))**2 + ((py - b.cy*H)/(b.ry*H))**2 < 1) return true;
+  return false;
+}
+
 // ── Terrain at ball position (for shot modifiers) ─────────────────────────────
 function getTerrainAt(px, py, W, H) {
-  if (isInSand(px, py, W, H)) return 'sand';
-  if (isInWater(px, py, W, H)) return 'water';
-  const m = Math.min(W, H);
-  const d = Math.hypot(px - W*0.49, py - H*0.49) / m;
-  if (d < 0.18) return 'fairway';
-  const fwDx = (LAYOUT.h1.x - LAYOUT.h2.x)*W, fwDy = (LAYOUT.h1.y - LAYOUT.h2.y)*H;
-  const fwL  = Math.hypot(fwDx, fwDy);
-  const perp = Math.abs((px - W*0.49)*(-fwDy/fwL) + (py - H*0.49)*(fwDx/fwL));
-  if (perp < m*0.22) return 'fairway';
+  if (isInSand(px, py, W, H))    return 'sand';
+  if (isInWater(px, py, W, H))   return 'water';
+  if (isInFairway(px, py, W, H)) return 'fairway';
   return 'rough';
 }
 
@@ -1728,11 +1734,11 @@ function onPointerUp(e) {
     let angle = Math.atan2(dy, dx);
     let power = dragDist * POWER_MULTIPLIER;
     if (terrain === 'rough') {
-      power *= 0.75 + Math.random() * 0.10;                              // 75–85%
-      angle += (Math.random() * 2 - 1) * (8 + Math.random() * 4) * Math.PI / 180; // ±8–12°
+      power *= 0.90 + Math.random() * 0.07;                              // 90–97%
+      angle += (Math.random() * 2 - 1) * (2 + Math.random() * 3) * Math.PI / 180; // ±2–5°
     } else if (terrain === 'sand') {
-      power *= 0.50 + Math.random() * 0.15;                              // 50–65%
-      angle += (Math.random() * 2 - 1) * (10 + Math.random() * 10) * Math.PI / 180; // ±10–20°
+      power *= 0.78 + Math.random() * 0.10;                              // 78–88%
+      angle += (Math.random() * 2 - 1) * (5 + Math.random() * 2) * Math.PI / 180; // ±5–7°
     }
     vx = Math.cos(angle) * power;
     vy = Math.sin(angle) * power;
@@ -1789,20 +1795,26 @@ function drawAimLine(ctx, W, H, sc) {
     ctx.fill();
   }
 
-  // Terrain warning label (rough / sand)
+  // Terrain badge (rough / sand) — compact pill above ball
   const terrain = getTerrainAt(ballPos.x, ballPos.y, W, H);
   if (terrain === 'rough' || terrain === 'sand') {
-    const label  = terrain === 'sand' ? '⛱ Sand — 50–65% power, ±20° wobble' : '🌿 Rough — 75–85% power, ±12° wobble';
-    const col    = terrain === 'sand' ? '#c8a028' : '#5a7a22';
-    const fs     = Math.max(11, 13 * sc);
+    const label = terrain === 'sand' ? '⛱ Sand' : '🌿 Rough';
+    const bgCol = terrain === 'sand' ? 'rgba(180,130,20,0.88)' : 'rgba(38,72,10,0.82)';
+    const fs    = Math.max(10, 11.5 * sc);
     ctx.save();
-    ctx.font         = `bold ${fs}px Nunito, sans-serif`;
+    ctx.font         = `700 ${fs}px Nunito, sans-serif`;
     ctx.textAlign    = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillStyle    = 'rgba(0,0,0,0.45)';
-    ctx.fillText(label, ballPos.x + 1, ballPos.y - 26 * sc + 1);
-    ctx.fillStyle = col;
-    ctx.fillText(label, ballPos.x, ballPos.y - 26 * sc);
+    ctx.textBaseline = 'middle';
+    const tw  = ctx.measureText(label).width;
+    const ph  = fs * 0.55, pv = fs * 0.38;
+    const bw  = tw + ph * 2, bh = fs + pv * 2;
+    const bx  = ballPos.x - bw / 2, by = ballPos.y - 32 * sc - bh;
+    ctx.fillStyle = bgCol;
+    ctx.beginPath();
+    ctx.roundRect(bx, by, bw, bh, bh / 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.fillText(label, ballPos.x, by + bh / 2);
     ctx.restore();
   }
 
