@@ -1000,8 +1000,9 @@ function flipCoin() {
   const isHeads = Math.random() < 0.5;
   pendingFirstPlayer = isHeads ? 1 : 2;
 
-  // Duration matches audio file exactly; fallback 2200ms if no file loaded
-  const duration  = SFX.coinFlip ? Math.round(SFX.coinFlip.duration * 1000) : 2200;
+  // Spin duration in ms — set COIN_FLIP_DURATION to override, or 0 to match audio length
+  const COIN_FLIP_DURATION = 0;
+  const duration  = COIN_FLIP_DURATION || (SFX.coinFlip ? Math.round(SFX.coinFlip.duration * 1000) : 2200);
   // ~4.5 spins/sec feels like a real tossed coin; min 3 so it always looks deliberate
   const rotations = Math.max(3, Math.round(duration / 1000 * 4.5));
   const targetDeg = rotations * 360 + (isHeads ? 0 : 180);
