@@ -1000,35 +1000,35 @@ function flipCoin() {
   const isHeads = Math.random() < 0.5;
   pendingFirstPlayer = isHeads ? 1 : 2;
 
-  // Coin flip sound: use file if loaded, otherwise synthesized decelerating ticks
+  // Duration matches audio file exactly; fallback 2200ms if no file loaded
+  const duration  = SFX.coinFlip ? Math.round(SFX.coinFlip.duration * 1000) : 2200;
+  // ~4.5 spins/sec feels like a real tossed coin; min 3 so it always looks deliberate
+  const rotations = Math.max(3, Math.round(duration / 1000 * 4.5));
+  const targetDeg = rotations * 360 + (isHeads ? 0 : 180);
+
+  // Sound — file plays in lockstep with animation; ticks scaled to real duration
   if (SFX.coinFlip) {
     _playBuf(SFX.coinFlip);
   } else {
-    let tickDelay = 30;
+    let tickDelay = duration * 0.014;
     for (let i = 0; i < 12; i++) {
+      if (tickDelay >= duration * 0.90) break;
       setTimeout(playCoinTick, tickDelay);
-      tickDelay += 28 * Math.pow(1.38, i);
+      tickDelay += duration * 0.013 * Math.pow(1.38, i);
     }
   }
 
-  const targetDeg = 6 * 360 + (isHeads ? 0 : 180);
-  const duration  = 2200;
   const startTime = performance.now();
-
   function animate(now) {
-    const elapsed  = now - startTime;
-    const progress = Math.min(elapsed / duration, 1);
-    // Ease-out quartic
+    const progress = Math.min((now - startTime) / duration, 1);
     const eased    = 1 - Math.pow(1 - progress, 4);
     coin.style.transition = 'none';
     coin.style.transform  = `rotateY(${eased * targetDeg}deg)`;
-
     if (progress < 1) {
       requestAnimationFrame(animate);
     } else {
       if (!SFX.coinFlip) playCoinLand();
-      // Show result
-      const name = isHeads ? 'Player 1' : 'Player 2';
+      const name  = isHeads ? 'Player 1' : 'Player 2';
       const color = isHeads ? '#A8B140' : '#6B3A22';
       result.innerHTML =
         `<span style="color:${color};font-weight:900">${name}</span> goes first!` +
