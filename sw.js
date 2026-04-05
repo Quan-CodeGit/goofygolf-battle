@@ -1,4 +1,4 @@
-const CACHE = 'goofygolf-v1';
+const CACHE = 'goofygolf-v2';
 
 self.addEventListener('install', e => {
   self.skipWaiting();

@@ -837,6 +837,96 @@ function mkRng(seed) {
   };
 }
 
+// ─── Audio Engine (Web Audio API — synthesized, no downloads, offline-ready) ──
+let _ac = null;
+function getAC() {
+  if (!_ac) _ac = new (window.AudioContext || window.webkitAudioContext)();
+  if (_ac.state === 'suspended') _ac.resume();
+  return _ac;
+}
+function _noise(ctx, dur) {
+  const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource(); src.buffer = buf; return src;
+}
+function _osc(ctx, freq, type = 'sine') {
+  const o = ctx.createOscillator(); o.type = type; o.frequency.value = freq; return o;
+}
+
+// Coin flip — tick sound (each face change during spin)
+function playCoinTick() {
+  const ctx = getAC(), t = ctx.currentTime;
+  const o = _osc(ctx, 1700, 'triangle'), g = ctx.createGain();
+  o.connect(g); g.connect(ctx.destination);
+  g.gain.setValueAtTime(0.13, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+  o.start(t); o.stop(t + 0.06);
+}
+// Coin flip — landing clink
+function playCoinLand() {
+  const ctx = getAC(), t = ctx.currentTime;
+  [[740, 0.30], [1110, 0.18], [1850, 0.10]].forEach(([f, v]) => {
+    const o = _osc(ctx, f), g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    g.gain.setValueAtTime(v, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+    o.start(t); o.stop(t + 0.60);
+  });
+}
+
+// Golf swing — 4 power tiers
+function playSwing(pct) {
+  const ctx = getAC(), t = ctx.currentTime;
+  const dur = pct <= 10 ? 0.14 : pct <= 40 ? 0.24 : pct <= 70 ? 0.30 : 0.38;
+  const vol = pct <= 10 ? 0.09 : pct <= 40 ? 0.21 : pct <= 70 ? 0.34 : 0.56;
+
+  const src = _noise(ctx, dur + 0.02);
+  const flt = ctx.createBiquadFilter();
+  const g   = ctx.createGain();
+  src.connect(flt); flt.connect(g); g.connect(ctx.destination);
+
+  if (pct <= 10) {
+    flt.type = 'bandpass'; flt.Q.value = 1.8;
+    flt.frequency.setValueAtTime(700, t);
+    flt.frequency.exponentialRampToValueAtTime(180, t + dur);
+  } else {
+    flt.type = 'lowpass';
+    flt.frequency.setValueAtTime(pct <= 40 ? 2000 : pct <= 70 ? 4000 : 6500, t);
+    flt.frequency.exponentialRampToValueAtTime(pct <= 40 ? 450 : 280, t + dur);
+  }
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  src.start(t); src.stop(t + dur + 0.01);
+
+  // Impact punch for medium-strong and super-strong hits
+  if (pct > 40) {
+    const impT  = pct <= 70 ? t + 0.04 : t;
+    const impF0 = pct <= 70 ? 110 : 190;
+    const impV  = pct <= 70 ? 0.36 : 0.62;
+    const impD  = pct <= 70 ? 0.18 : 0.13;
+    const oi = _osc(ctx, impF0), gi = ctx.createGain();
+    oi.connect(gi); gi.connect(ctx.destination);
+    oi.frequency.setValueAtTime(impF0, impT);
+    oi.frequency.exponentialRampToValueAtTime(26, impT + impD);
+    gi.gain.setValueAtTime(impV, impT);
+    gi.gain.exponentialRampToValueAtTime(0.001, impT + impD);
+    oi.start(impT); oi.stop(impT + impD + 0.01);
+  }
+}
+
+// Hole sink — satisfying "plop"
+function playHoleSink() {
+  const ctx = getAC(), t = ctx.currentTime;
+  const o = _osc(ctx, 270), g = ctx.createGain();
+  o.connect(g); g.connect(ctx.destination);
+  o.frequency.setValueAtTime(270, t);
+  o.frequency.exponentialRampToValueAtTime(75, t + 0.20);
+  g.gain.setValueAtTime(0.42, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+  o.start(t); o.stop(t + 0.25);
+}
+
 // ─── Screen helpers ──────────────────────────────────────────────────────────
 function showMenu() {
   if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
@@ -879,6 +969,13 @@ function flipCoin() {
   const isHeads = Math.random() < 0.5;
   pendingFirstPlayer = isHeads ? 1 : 2;
 
+  // Schedule decelerating tick sounds (12 ticks over 2.2s, exponentially spaced)
+  let tickDelay = 30;
+  for (let i = 0; i < 12; i++) {
+    setTimeout(playCoinTick, tickDelay);
+    tickDelay += 28 * Math.pow(1.38, i);
+  }
+
   const targetDeg = 6 * 360 + (isHeads ? 0 : 180);
   const duration  = 2200;
   const startTime = performance.now();
@@ -894,6 +991,7 @@ function flipCoin() {
     if (progress < 1) {
       requestAnimationFrame(animate);
     } else {
+      playCoinLand();
       // Show result
       const name = isHeads ? 'Player 1' : 'Player 2';
       const color = isHeads ? '#A8B140' : '#6B3A22';
@@ -1421,7 +1519,7 @@ function physicsUpdate(dt) {
 
 function handleHoleSink(holeOwner) {
   vx = 0; vy = 0; ballMoving = false; gameState = 'IDLE';
-  // Hole owner always wins the round (wrong hole gives point to the hole's owner)
+  playHoleSink();
   GOLF.roundWon(holeOwner);
 }
 
@@ -1471,6 +1569,7 @@ function onPointerUp(e) {
   const dx = dragStart.x - dragCurrent.x, dy = dragStart.y - dragCurrent.y;
   const dragDist = Math.min(Math.hypot(dx, dy), MAX_DRAG_DISTANCE);
   if (dragDist >= MIN_SHOOT_POWER) {
+    playSwing(dragDist / MAX_DRAG_DISTANCE * 100);
     const angle = Math.atan2(dy, dx), power = dragDist * POWER_MULTIPLIER;
     vx = Math.cos(angle) * power;
     vy = Math.sin(angle) * power;
