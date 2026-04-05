@@ -837,8 +837,10 @@ function mkRng(seed) {
   };
 }
 
-// ─── Audio Engine (Web Audio API — synthesized, no downloads, offline-ready) ──
+// ─── Audio Engine (file-based with synthesized fallback, offline-ready) ───────
 let _ac = null;
+const SFX = {};  // decoded AudioBuffers loaded from sounds/ folder
+
 function getAC() {
   if (!_ac) _ac = new (window.AudioContext || window.webkitAudioContext)();
   if (_ac.state === 'suspended') _ac.resume();
@@ -854,7 +856,37 @@ function _osc(ctx, freq, type = 'sine') {
   const o = ctx.createOscillator(); o.type = type; o.frequency.value = freq; return o;
 }
 
-// Coin flip — tick sound (each face change during spin)
+// Try to load all files from sounds/ — silently skip any that are missing
+async function loadSounds() {
+  const ctx = getAC();
+  const files = {
+    coinFlip:    'sounds/coin-flip.mp3',
+    swingGentle: 'sounds/swing-gentle.mp3',
+    swingMedium: 'sounds/swing-medium.mp3',
+    swingStrong: 'sounds/swing-strong.mp3',
+    swingMax:    'sounds/swing-max.mp3',
+  };
+  await Promise.all(Object.entries(files).map(async ([key, url]) => {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return;
+      SFX[key] = await ctx.decodeAudioData(await res.arrayBuffer());
+    } catch { /* file missing — synthesized fallback will be used */ }
+  }));
+}
+
+// Play a decoded buffer at optional volume
+function _playBuf(buf, vol = 1) {
+  const ctx = getAC();
+  const src = ctx.createBufferSource();
+  const g   = ctx.createGain();
+  src.buffer = buf;
+  src.connect(g); g.connect(ctx.destination);
+  g.gain.value = vol;
+  src.start();
+}
+
+// Coin flip — tick sound (synthesized fallback)
 function playCoinTick() {
   const ctx = getAC(), t = ctx.currentTime;
   const o = _osc(ctx, 1700, 'triangle'), g = ctx.createGain();
@@ -863,7 +895,7 @@ function playCoinTick() {
   g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
   o.start(t); o.stop(t + 0.06);
 }
-// Coin flip — landing clink
+// Coin flip — landing clink (synthesized fallback)
 function playCoinLand() {
   const ctx = getAC(), t = ctx.currentTime;
   [[740, 0.30], [1110, 0.18], [1850, 0.10]].forEach(([f, v]) => {
@@ -875,17 +907,20 @@ function playCoinLand() {
   });
 }
 
-// Golf swing — 4 power tiers
+// Golf swing — uses file if available, otherwise synthesizes
 function playSwing(pct) {
+  const key = pct <= 10 ? 'swingGentle' : pct <= 40 ? 'swingMedium' : pct <= 70 ? 'swingStrong' : 'swingMax';
+  // Boost gentle swing volume since it's quieter
+  if (SFX[key]) { _playBuf(SFX[key], pct <= 10 ? 1.8 : 1.0); return; }
+
+  // Synthesized fallback
   const ctx = getAC(), t = ctx.currentTime;
   const dur = pct <= 10 ? 0.14 : pct <= 40 ? 0.24 : pct <= 70 ? 0.30 : 0.38;
   const vol = pct <= 10 ? 0.09 : pct <= 40 ? 0.21 : pct <= 70 ? 0.34 : 0.56;
-
   const src = _noise(ctx, dur + 0.02);
   const flt = ctx.createBiquadFilter();
   const g   = ctx.createGain();
   src.connect(flt); flt.connect(g); g.connect(ctx.destination);
-
   if (pct <= 10) {
     flt.type = 'bandpass'; flt.Q.value = 1.8;
     flt.frequency.setValueAtTime(700, t);
@@ -898,19 +933,14 @@ function playSwing(pct) {
   g.gain.setValueAtTime(vol, t);
   g.gain.exponentialRampToValueAtTime(0.001, t + dur);
   src.start(t); src.stop(t + dur + 0.01);
-
-  // Impact punch for medium-strong and super-strong hits
   if (pct > 40) {
-    const impT  = pct <= 70 ? t + 0.04 : t;
-    const impF0 = pct <= 70 ? 110 : 190;
-    const impV  = pct <= 70 ? 0.36 : 0.62;
-    const impD  = pct <= 70 ? 0.18 : 0.13;
+    const impT = pct <= 70 ? t + 0.04 : t, impF0 = pct <= 70 ? 110 : 190;
+    const impV = pct <= 70 ? 0.36 : 0.62, impD  = pct <= 70 ? 0.18 : 0.13;
     const oi = _osc(ctx, impF0), gi = ctx.createGain();
     oi.connect(gi); gi.connect(ctx.destination);
     oi.frequency.setValueAtTime(impF0, impT);
     oi.frequency.exponentialRampToValueAtTime(26, impT + impD);
-    gi.gain.setValueAtTime(impV, impT);
-    gi.gain.exponentialRampToValueAtTime(0.001, impT + impD);
+    gi.gain.setValueAtTime(impV, impT); gi.gain.exponentialRampToValueAtTime(0.001, impT + impD);
     oi.start(impT); oi.stop(impT + impD + 0.01);
   }
 }
@@ -934,6 +964,7 @@ function showMenu() {
 }
 function showGame() {
   menu.classList.add('hidden'); game.classList.remove('hidden');
+  loadSounds();
   showCoinFlip();
 }
 function showHTP()  { $('htpOverlay').classList.add('show'); }
@@ -969,11 +1000,15 @@ function flipCoin() {
   const isHeads = Math.random() < 0.5;
   pendingFirstPlayer = isHeads ? 1 : 2;
 
-  // Schedule decelerating tick sounds (12 ticks over 2.2s, exponentially spaced)
-  let tickDelay = 30;
-  for (let i = 0; i < 12; i++) {
-    setTimeout(playCoinTick, tickDelay);
-    tickDelay += 28 * Math.pow(1.38, i);
+  // Coin flip sound: use file if loaded, otherwise synthesized decelerating ticks
+  if (SFX.coinFlip) {
+    _playBuf(SFX.coinFlip);
+  } else {
+    let tickDelay = 30;
+    for (let i = 0; i < 12; i++) {
+      setTimeout(playCoinTick, tickDelay);
+      tickDelay += 28 * Math.pow(1.38, i);
+    }
   }
 
   const targetDeg = 6 * 360 + (isHeads ? 0 : 180);
@@ -991,7 +1026,7 @@ function flipCoin() {
     if (progress < 1) {
       requestAnimationFrame(animate);
     } else {
-      playCoinLand();
+      if (!SFX.coinFlip) playCoinLand();
       // Show result
       const name = isHeads ? 'Player 1' : 'Player 2';
       const color = isHeads ? '#A8B140' : '#6B3A22';
