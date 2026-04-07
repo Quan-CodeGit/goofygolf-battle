@@ -1421,17 +1421,17 @@ function drawWater(ctx, cx, cy, rx, ry, rot, wobble = 0, sc = 1) {
   ctx.translate(cx, cy);
   ctx.rotate(rot);
 
-  // ── 1. Ground depression shadow (same convention as trees/holes) ──────
-  ctx.save();
-  ctx.globalAlpha = 0.32;
-  ctx.shadowColor = 'rgba(0,0,0,0.40)';
-  ctx.shadowBlur  = 10 * sc;
-  ctx.shadowOffsetX = 3 * sc;
-  ctx.shadowOffsetY = 5 * sc;
-  ctx.fillStyle = 'rgba(0,0,0,1)';
-  waterPath();
-  ctx.fill();
-  ctx.restore();
+  // ── 1. Grass transition ring — pond appears carved INTO the green ─────
+  // Soft concentric rings of grass-green outside the water edge replace the
+  // old raised-shadow disk. The pond now looks like a depression, not a disk.
+  for (let i = 4; i >= 1; i--) {
+    const s = 1 + i * 0.044;
+    ctx.save(); ctx.scale(s, s);
+    waterPath();
+    ctx.fillStyle = `rgba(36, 88, 18, ${(0.14 - i * 0.026).toFixed(3)})`;
+    ctx.fill();
+    ctx.restore();
+  }
 
   // ── 2. Clip everything to the wobbly shape ───────────────────────────
   ctx.save();
@@ -1505,22 +1505,21 @@ function drawSand(ctx, cx, cy, rx, ry, sc = 1) {
   ctx.save();
   ctx.translate(cx, cy);
 
-  // ── 1. Ground depression shadow (same offset convention as trees) ─────
-  ctx.save();
-  ctx.globalAlpha = 0.28;
-  ctx.shadowColor = 'rgba(0,0,0,0.45)';
-  ctx.shadowBlur  = 8 * sc;
-  ctx.shadowOffsetX = 2 * sc;
-  ctx.shadowOffsetY = 4 * sc;
-  ctx.fillStyle = 'rgba(0,0,0,1)';
-  ctx.beginPath();
-  ctx.ellipse(0, 0, rx * 1.04, ry * 1.04, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+  // ── 1. Grass transition ring — bunker appears carved INTO the green ────
+  // No raised shadow. Instead, soft grass rings fade into the bunker edge.
+  for (let i = 4; i >= 1; i--) {
+    const s = 1 + i * 0.050;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx * s, ry * s, 0, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(36, 88, 18, ${(0.13 - i * 0.024).toFixed(3)})`;
+    ctx.fill();
+  }
 
-  // ── 2. Dark pit wall / bunker rim (the outer ring you see looking in) ─
-  ctx.globalAlpha = 0.95;
-  ctx.fillStyle = '#9A7830';
+  // ── 2. Bunker depression — dark crescent at near edge (inside the bowl) ─
+  // The outer ellipse base is a neutral tan, then a clipped inner shadow
+  // at the bottom edge simulates the far-wall-cast shadow of a deep trap.
+  ctx.globalAlpha = 0.92;
+  ctx.fillStyle = '#C8A850';   // warm sandy-tan base (lighter = not a raised wall)
   ctx.beginPath();
   ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -1551,17 +1550,24 @@ function drawSand(ctx, cx, cy, rx, ry, sc = 1) {
     ctx.fill();
   }
 
-  // ── 5. Directional inner shadow — top lit, bottom shaded (bowl depth) ─
+  // ── 5. Bowl depth — near-side depression shadow + far-side sky lift ────
+  // Clipped to the full bunker ellipse so the gradient wraps the inside bowl.
+  ctx.save();
   ctx.globalAlpha = 1;
-  const innerG = ctx.createLinearGradient(0, -ry * 0.88, 0, ry * 0.88);
-  innerG.addColorStop(0,    'rgba(255,250,220,0.18)');  // top rim: lit
-  innerG.addColorStop(0.30, 'rgba(255,250,220,0)');
-  innerG.addColorStop(0.62, 'rgba(0,0,0,0)');
-  innerG.addColorStop(1,    'rgba(0,0,0,0.32)');         // near rim: shadow
-  ctx.fillStyle = innerG;
   ctx.beginPath();
-  ctx.ellipse(-rx * 0.02, -ry * 0.06, rx * 0.87, ry * 0.85, 0, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+  ctx.clip();
+
+  // Far-top: slight bright (ground catches sky)
+  // Near-bottom: dark crescent (deep bowl wall shadow)
+  const innerG = ctx.createLinearGradient(0, -ry * 1.0, 0, ry * 1.0);
+  innerG.addColorStop(0,    'rgba(255,252,230,0.14)');   // top: sky-lit far bank
+  innerG.addColorStop(0.35, 'rgba(255,252,230,0)');
+  innerG.addColorStop(0.60, 'rgba(0,0,0,0)');
+  innerG.addColorStop(1,    'rgba(30,18,0,0.48)');       // bottom: near-wall shadow
+  ctx.fillStyle = innerG;
+  ctx.fillRect(-rx * 1.2, -ry * 1.2, rx * 2.4, ry * 2.4);
+  ctx.restore();
 
   ctx.restore();
 }
