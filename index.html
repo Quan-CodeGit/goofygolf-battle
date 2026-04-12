@@ -1283,14 +1283,6 @@ function drawGrassZones(ctx, W, H) {
     bG.addColorStop(1,    'rgba(0,0,0,0.10)');
     ctx.fillStyle = bG;
     ctx.fillRect(-frx, -fry, frx * 2, fry * 2);
-
-    // Horizontal mow lines (Style I) — alternating light/dark bands
-    const mowH = Math.max(10, fry * 0.18);
-    for (let row = -fry; row < fry; row += mowH) {
-      const even = Math.floor((row + fry) / mowH) % 2 === 0;
-      ctx.fillStyle = even ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.030)';
-      ctx.fillRect(-frx * 1.1, row, frx * 2.2, mowH);
-    }
     ctx.restore();
   }
 
