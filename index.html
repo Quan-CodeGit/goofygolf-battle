@@ -1265,7 +1265,7 @@ function drawGrassZones(ctx, W, H) {
     ctx.restore();
   }
 
-  // 2b. Directional bevel on fairway — matches tree/hole lighting (top lit, bottom shadowed)
+  // 2b. Directional bevel + Style I mow lines inside each fairway blob
   for (const b of LAYOUT.fairway) {
     const fcx = b.cx * W, fcy = b.cy * H;
     const frx = b.rx * W, fry = b.ry * H;
@@ -1274,13 +1274,23 @@ function drawGrassZones(ctx, W, H) {
     ctx.beginPath();
     ctx.ellipse(0, 0, frx * 1.08, fry * 1.08, 0, 0, Math.PI * 2);
     ctx.clip();
+
+    // Top-lit / bottom-shadowed bevel
     const bG = ctx.createLinearGradient(0, -fry, 0, fry);
-    bG.addColorStop(0,    'rgba(255,255,255,0.10)');  // top: sun-lit edge
+    bG.addColorStop(0,    'rgba(255,255,255,0.10)');
     bG.addColorStop(0.35, 'rgba(255,255,255,0)');
     bG.addColorStop(0.65, 'rgba(0,0,0,0)');
-    bG.addColorStop(1,    'rgba(0,0,0,0.10)');        // bottom: shadowed edge
+    bG.addColorStop(1,    'rgba(0,0,0,0.10)');
     ctx.fillStyle = bG;
     ctx.fillRect(-frx, -fry, frx * 2, fry * 2);
+
+    // Horizontal mow lines (Style I) — alternating light/dark bands
+    const mowH = Math.max(10, fry * 0.18);
+    for (let row = -fry; row < fry; row += mowH) {
+      const even = Math.floor((row + fry) / mowH) % 2 === 0;
+      ctx.fillStyle = even ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.030)';
+      ctx.fillRect(-frx * 1.1, row, frx * 2.2, mowH);
+    }
     ctx.restore();
   }
 
@@ -1466,13 +1476,20 @@ function drawWater(ctx, cx, cy, rx, ry, rot, wobble = 0, sc = 1) {
     ctx.stroke();
   }
 
-  // ── 5. Near-bank shadow — THIN crescent at bottom edge ONLY ──────────
-  // Starts at 40% into ry so it only covers the near edge, never the top.
-  // This is the primary 3D cue that the bank is raised above the water plane.
-  const bankG = ctx.createLinearGradient(0, ry * 0.40, 0, ry);
+  // ── 5. Near-bank shadow — dark crescent at bottom (near bank in shadow) ─
+  const bankG = ctx.createLinearGradient(0, ry * 0.35, 0, ry);
   bankG.addColorStop(0, 'rgba(0,0,0,0)');
-  bankG.addColorStop(1, 'rgba(0,35,72,0.36)');
+  bankG.addColorStop(1, 'rgba(0,30,68,0.44)');
   ctx.fillStyle = bankG;
+  ctx.fillRect(-rx * 1.3, -ry * 1.3, rx * 2.6, ry * 2.6);
+
+  // ── 5b. Far-bank sky reflection — bright strip at top (Style I depth) ──
+  // The far bank catches open sky. This is the strongest depth cue that
+  // tells the eye the water surface is lower than the surrounding grass.
+  const skyG = ctx.createLinearGradient(0, -ry, 0, -ry * 0.30);
+  skyG.addColorStop(0, 'rgba(215,242,255,0.30)');
+  skyG.addColorStop(1, 'rgba(215,242,255,0)');
+  ctx.fillStyle = skyG;
   ctx.fillRect(-rx * 1.3, -ry * 1.3, rx * 2.6, ry * 2.6);
 
   ctx.restore(); // end clip
@@ -1558,14 +1575,19 @@ function drawSand(ctx, cx, cy, rx, ry, sc = 1) {
   ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
   ctx.clip();
 
-  // Far-top: slight bright (ground catches sky)
-  // Near-bottom: dark crescent (deep bowl wall shadow)
+  // Near-bottom: dark crescent (near-wall in shadow)
   const innerG = ctx.createLinearGradient(0, -ry * 1.0, 0, ry * 1.0);
-  innerG.addColorStop(0,    'rgba(255,252,230,0.14)');   // top: sky-lit far bank
-  innerG.addColorStop(0.35, 'rgba(255,252,230,0)');
-  innerG.addColorStop(0.60, 'rgba(0,0,0,0)');
-  innerG.addColorStop(1,    'rgba(30,18,0,0.48)');       // bottom: near-wall shadow
+  innerG.addColorStop(0,    'rgba(255,252,230,0)');
+  innerG.addColorStop(0.55, 'rgba(0,0,0,0)');
+  innerG.addColorStop(1,    'rgba(30,18,0,0.50)');
   ctx.fillStyle = innerG;
+  ctx.fillRect(-rx * 1.2, -ry * 1.2, rx * 2.4, ry * 2.4);
+
+  // Far-top: sky lift — bright warm strip at far rim (Style I depth cue)
+  const skyLift = ctx.createLinearGradient(0, -ry, 0, -ry * 0.28);
+  skyLift.addColorStop(0, 'rgba(255,252,225,0.28)');
+  skyLift.addColorStop(1, 'rgba(255,252,225,0)');
+  ctx.fillStyle = skyLift;
   ctx.fillRect(-rx * 1.2, -ry * 1.2, rx * 2.4, ry * 2.4);
   ctx.restore();
 
@@ -1581,16 +1603,24 @@ function drawTree(ctx, x, y, sc = 1) {
   ctx.fillStyle = '#6B3A22';
   ctx.fillRect(-4 * sc, -2 * sc, 8 * sc, 20 * sc);
   [
-    { r: 24 * sc, dy:  -6 * sc, c: '#4a5a1a' },
-    { r: 22 * sc, dy: -18 * sc, c: '#5C6A24' },
-    { r: 18 * sc, dy: -29 * sc, c: '#7A8C30' },
-    { r: 13 * sc, dy: -39 * sc, c: '#8FA038' },
-  ].forEach(({ r, dy, c }) => {
+    { r: 24 * sc, dy:  -6 * sc, c: '#4a5a1a', fc: '36,72,12' },
+    { r: 22 * sc, dy: -18 * sc, c: '#5C6A24', fc: '48,82,18' },
+    { r: 18 * sc, dy: -29 * sc, c: '#7A8C30', fc: '58,95,22' },
+    { r: 13 * sc, dy: -39 * sc, c: '#8FA038', fc: '72,110,28' },
+  ].forEach(({ r, dy, c, fc }) => {
+    // Style B — soft feathered outer rings (watercolor bleed into ground)
+    for (let i = 3; i >= 1; i--) {
+      ctx.globalAlpha = 0.07 + i * 0.012;
+      ctx.fillStyle = `rgba(${fc},1)`;
+      ctx.beginPath(); ctx.arc(0, dy, r * (1 + i * 0.10), 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // Style I — solid fill with subtle shadow (realistic depth)
     ctx.fillStyle = c;
-    ctx.shadowColor = 'rgba(0,0,0,0.14)'; ctx.shadowBlur = 5;
+    ctx.shadowColor = 'rgba(0,0,0,0.18)'; ctx.shadowBlur = 6;
     ctx.beginPath(); ctx.arc(0, dy, r, 0, Math.PI * 2); ctx.fill();
   });
-  ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(255,255,255,0.13)'; ctx.shadowBlur = 0;
   ctx.beginPath(); ctx.arc(-5 * sc, -35 * sc, 7 * sc, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 }
