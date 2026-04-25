@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Goofy Golf Battle!</title>
   <link rel="manifest" href="/manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -399,6 +402,89 @@
     .modal-cta:hover { box-shadow: 0 8px 0 var(--olive-dk), 0 14px 24px rgba(92,106,36,0.28); }
     .modal-cta:active { box-shadow: 0 2px 0 var(--olive-dk) !important; }
 
+    /* ═══════════════════════════════════════════
+       ROTATE DEVICE OVERLAY
+    ═══════════════════════════════════════════ */
+    #rotateOverlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: #111e0d;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 24px;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    #rotateOverlay.show { opacity: 1; pointer-events: all; }
+    .rotate-icon-wrap {
+      animation: phoneRotate 2.2s cubic-bezier(0.4,0,0.2,1) infinite;
+    }
+    @keyframes phoneRotate {
+      0%, 30%  { transform: rotate(0deg); }
+      65%, 100% { transform: rotate(90deg); }
+    }
+    .rotate-msg {
+      font-family: 'Fredoka One', cursive;
+      font-size: clamp(18px, 5vw, 26px);
+      color: var(--lime);
+      text-align: center;
+      line-height: 1.5;
+    }
+    .rotate-sub {
+      font-size: clamp(12px, 3vw, 15px);
+      font-weight: 700;
+      color: rgba(200,220,180,0.55);
+      text-align: center;
+      margin-top: -12px;
+    }
+
+    /* ═══════════════════════════════════════════
+       FULLSCREEN BUTTON
+    ═══════════════════════════════════════════ */
+    .btn-fullscreen {
+      background: var(--teal); color: #fff;
+      box-shadow: 0 3px 0 var(--teal-dk);
+      padding: 8px 11px;
+      border-radius: 12px;
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-fullscreen:hover  { background: var(--teal-dk); transform: translateY(-1px); }
+    .btn-fullscreen:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--teal-dk); }
+
+    /* ═══════════════════════════════════════════
+       MOBILE RESPONSIVE
+    ═══════════════════════════════════════════ */
+    /* Compact HUD for small screens */
+    @media (max-height: 420px), (max-width: 600px) {
+      .hud          { height: 58px; }
+      .p-avatar     { width: 36px; height: 36px; font-size: 15px; }
+      .round-num    { font-size: 20px; }
+      .hud-center   { min-width: 88px; padding: 4px 8px; gap: 3px; }
+      .round-eyebrow{ font-size: 9px; }
+      .turn-label   { font-size: 11px; }
+      .turn-pip     { width: 7px; height: 7px; }
+      .p-name       { font-size: 11px; }
+      .win-pip      { width: 11px; height: 11px; }
+      .bottom-bar   { height: 46px; padding: 0 10px; gap: 8px; }
+      .hint-text    { font-size: 11px; }
+      .btn-sm       { font-size: 12px; padding: 6px 10px; }
+    }
+    /* Landscape phone: hide hint text to save HUD width */
+    @media (max-height: 380px) {
+      .hint-text { display: none; }
+    }
+    /* Safe area insets for notched/curved phones */
+    @supports (padding: env(safe-area-inset-left)) {
+      .hud        { padding-left:  env(safe-area-inset-left);
+                    padding-right: env(safe-area-inset-right); }
+      .bottom-bar { padding-left:  calc(10px + env(safe-area-inset-left));
+                    padding-right: calc(10px + env(safe-area-inset-right));
+                    padding-bottom: env(safe-area-inset-bottom); }
+    }
+
     /* ── Penalty / terrain toast ── */
     .penalty-toast {
       position: fixed; top: 42%; left: 50%;
@@ -659,9 +745,41 @@
     <button class="btn-sm btn-quit" id="btnQuit">🏠 Quit</button>
     <span class="hint-text">Hold &amp; drag backward → release to shoot</span>
     <div class="stroke-chip" id="strokeChip">Strokes: 0</div>
+    <!-- Fullscreen toggle button (custom SVG icon, no image download) -->
+    <button class="btn-fullscreen" id="btnFullscreen" title="Toggle Fullscreen" aria-label="Toggle Fullscreen">
+      <svg id="fsIcon" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Expand icon: 4 corner L-brackets pointing outward -->
+        <path d="M1 7V1H7" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M19 7V1H13" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M1 13V19H7" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M19 13V19H13" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
   </div>
 
 </div><!-- /#game -->
+
+<!-- ════════════════════════════════════
+     ROTATE DEVICE OVERLAY (mobile portrait guard)
+════════════════════════════════════ -->
+<div id="rotateOverlay" role="alert" aria-live="polite">
+  <!-- Animated phone SVG — rotates 90° to show the hint -->
+  <div class="rotate-icon-wrap">
+    <svg width="90" height="90" viewBox="0 0 90 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Phone body -->
+      <rect x="28" y="8" width="34" height="60" rx="7" stroke="#C8D15A" stroke-width="3" fill="rgba(200,209,90,0.08)"/>
+      <!-- Home button -->
+      <circle cx="45" cy="60" r="4.5" stroke="#C8D15A" stroke-width="2.5" fill="none"/>
+      <!-- Speaker grille -->
+      <rect x="38" y="15" width="14" height="3" rx="1.5" fill="#C8D15A" opacity="0.45"/>
+      <!-- Rotation arc arrow -->
+      <path d="M18 45 Q18 16 45 16" stroke="#7EC8E3" stroke-width="2.5" stroke-linecap="round" fill="none" stroke-dasharray="5 4"/>
+      <polygon points="41,10 45,16 49,10" fill="#7EC8E3"/>
+    </svg>
+  </div>
+  <div class="rotate-msg">Rotate your device ⛳</div>
+  <div class="rotate-sub">This game plays best in landscape</div>
+</div>
 
 <!-- Penalty / terrain toast -->
 <div id="penaltyToast" class="penalty-toast"></div>
@@ -2058,7 +2176,66 @@ window.addEventListener('resize', () => {
     ballPos = null; lastSafePos = null;
     resizeCanvas();
   }
+  checkOrientation();
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  FULLSCREEN + ORIENTATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+// SVG paths for expand / collapse icons
+const FS_EXPAND_PATHS = `
+  <path d="M1 7V1H7"   stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M19 7V1H13" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M1 13V19H7"  stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M19 13V19H13" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+const FS_COLLAPSE_PATHS = `
+  <path d="M7 1V7H1"   stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M13 1V7H19" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M7 19V13H1"  stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M13 19V13H19" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => {
+      // Lock orientation to landscape on supported mobile browsers
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(() => {});
+      }
+    }).catch(() => {});
+  } else {
+    document.exitFullscreen().catch(() => {});
+  }
+}
+
+// Update icon when fullscreen state changes
+document.addEventListener('fullscreenchange', () => {
+  const icon = document.getElementById('fsIcon');
+  if (!icon) return;
+  icon.innerHTML = document.fullscreenElement ? FS_COLLAPSE_PATHS : FS_EXPAND_PATHS;
+});
+
+$('btnFullscreen').addEventListener('click', toggleFullscreen);
+
+// ─── Rotate overlay — only shown on touch devices in portrait ──────────────
+// Detects touch screen via pointer: coarse (more reliable than user-agent)
+const isTouchDevice = window.matchMedia('(pointer: coarse)').matches
+                   || navigator.maxTouchPoints > 0;
+
+function checkOrientation() {
+  if (!isTouchDevice) return;           // desktops: never show rotate prompt
+  const portrait = window.innerHeight > window.innerWidth;
+  document.getElementById('rotateOverlay').classList.toggle('show', portrait);
+}
+
+window.addEventListener('orientationchange', () => {
+  // Small delay lets the browser finish rotating before reading new dimensions
+  setTimeout(checkOrientation, 120);
+});
+
+// Run once on load
+checkOrientation();
 </script>
 
 <script>
