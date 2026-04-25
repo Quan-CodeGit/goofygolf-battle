@@ -199,6 +199,7 @@
     ═══════════════════════════════════════════ */
     #game {
       display: flex; flex-direction: column;
+      position: relative;   /* anchor for floating bottom bar */
       background: var(--cream);
     }
 
@@ -440,6 +441,22 @@
     /* ═══════════════════════════════════════════
        FULLSCREEN BUTTON
     ═══════════════════════════════════════════ */
+    /* Floating fullscreen button on menu screen */
+    #menuFsBtn {
+      position: absolute; top: 14px; right: 14px; z-index: 10;
+      background: rgba(90,110,30,0.55);
+      border: 2px solid rgba(200,209,90,0.45);
+      border-radius: 10px;
+      padding: 7px 9px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, transform 0.12s;
+      -webkit-tap-highlight-color: transparent;
+      backdrop-filter: blur(6px);
+    }
+    #menuFsBtn:hover  { background: rgba(90,110,30,0.80); transform: scale(1.08); }
+    #menuFsBtn:active { transform: scale(0.95); }
+
     .btn-fullscreen {
       background: var(--teal); color: #fff;
       box-shadow: 0 3px 0 var(--teal-dk);
@@ -455,34 +472,91 @@
     .btn-fullscreen:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--teal-dk); }
 
     /* ═══════════════════════════════════════════
-       MOBILE RESPONSIVE
+       MOBILE RESPONSIVE — LANDSCAPE PHONE
     ═══════════════════════════════════════════ */
-    /* Compact HUD for small screens */
-    @media (max-height: 420px), (max-width: 600px) {
-      .hud          { height: 58px; }
-      .p-avatar     { width: 36px; height: 36px; font-size: 15px; }
-      .round-num    { font-size: 20px; }
-      .hud-center   { min-width: 88px; padding: 4px 8px; gap: 3px; }
-      .round-eyebrow{ font-size: 9px; }
-      .turn-label   { font-size: 11px; }
-      .turn-pip     { width: 7px; height: 7px; }
-      .p-name       { font-size: 11px; }
-      .win-pip      { width: 11px; height: 11px; }
-      .bottom-bar   { height: 46px; padding: 0 10px; gap: 8px; }
-      .hint-text    { font-size: 11px; }
-      .btn-sm       { font-size: 12px; padding: 6px 10px; }
+
+    /* ── Menu: switch to side-by-side layout in landscape ── */
+    @media (orientation: landscape) and (max-height: 520px) {
+      .menu-inner {
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 32px;
+        padding: 10px 24px;
+      }
+      /* Left column: ball + title */
+      .menu-inner > .hero-ball { width: 54px; height: 54px; flex-shrink: 0; }
+      .title-wrap { text-align: left; }
+      .game-title { font-size: clamp(28px, 9vh, 54px); }
+      .game-sub   { font-size: clamp(11px, 3vh, 18px); letter-spacing: 3px; margin-top: 3px; }
+      /* Right column: buttons */
+      .btn-stack  { width: min(260px, 44vw); gap: 10px; }
+      .btn        { font-size: 17px; padding: 12px 20px; border-radius: 14px; }
+      .btn-icon   { font-size: 18px; }
+      /* Hills don't need to be tall */
+      .hills      { height: 110px; }
     }
-    /* Landscape phone: hide hint text to save HUD width */
-    @media (max-height: 380px) {
+    /* Hide ball on very short landscape (saves vertical space) */
+    @media (orientation: landscape) and (max-height: 380px) {
+      .menu-inner > .hero-ball { display: none; }
+      .game-title { font-size: clamp(24px, 8vh, 44px); }
+      .btn        { font-size: 15px; padding: 10px 16px; }
+    }
+
+    /* ── Game: ultra-compact HUD + floating bottom bar ── */
+    @media (orientation: landscape) and (max-height: 520px) {
+      /* HUD: flat strip */
+      .hud          { height: 50px; }
+      .p-hud        { gap: 8px; padding: 6px 12px; }
+      .p-avatar     { width: 30px; height: 30px; font-size: 12px; border-width: 2px; }
+      .p-name       { font-size: 10px; letter-spacing: 0.5px; }
+      .win-pip      { width: 9px; height: 9px; border-width: 2px; }
+      .p-wins       { gap: 4px; }
+      .round-eyebrow{ display: none; }   /* hide "ROUND" label */
+      .round-num    { font-size: 17px; }
+      .hud-center   { min-width: 76px; padding: 3px 8px; gap: 2px; }
+      .turn-pill    { padding: 2px 8px; }
+      .turn-pip     { width: 6px; height: 6px; }
+      .turn-label   { font-size: 10px; }
+
+      /* Canvas fills all space below HUD — bottom bar floats ON TOP of it */
+      .canvas-wrap  { flex: 1; }
+      .bottom-bar   {
+        position: absolute; bottom: 0; left: 0; right: 0; z-index: 20;
+        height: 36px; padding: 0 10px; gap: 8px;
+        background: rgba(238,236,218,0.90);
+        backdrop-filter: blur(10px);
+        border-top: 1px solid rgba(0,0,0,0.08);
+      }
+      .btn-sm       { font-size: 11px; padding: 5px 9px; border-radius: 9px; }
+      .hint-text    { font-size: 10px; }
+      .stroke-chip  { font-size: 11px; padding: 4px 10px; border-radius: 9px; }
+      .btn-fullscreen { padding: 5px 8px; }
+      .btn-fullscreen svg { width: 15px; height: 15px; }
+    }
+    /* Tiny phones: hide hint text */
+    @media (orientation: landscape) and (max-height: 380px) {
       .hint-text { display: none; }
     }
-    /* Safe area insets for notched/curved phones */
+
+    /* ── Portrait small screens (fallback) ── */
+    @media (max-width: 480px) and (orientation: portrait) {
+      .game-title { font-size: clamp(44px, 12vw, 80px); }
+      .btn { font-size: 19px; padding: 14px 22px; }
+      .hud { height: 72px; }
+      .p-avatar { width: 40px; height: 40px; font-size: 16px; }
+      .round-num { font-size: 22px; }
+    }
+
+    /* ── Safe-area insets (notched / curved phones) ── */
     @supports (padding: env(safe-area-inset-left)) {
       .hud        { padding-left:  env(safe-area-inset-left);
                     padding-right: env(safe-area-inset-right); }
       .bottom-bar { padding-left:  calc(10px + env(safe-area-inset-left));
                     padding-right: calc(10px + env(safe-area-inset-right));
                     padding-bottom: env(safe-area-inset-bottom); }
+      #menu       { padding-left:  env(safe-area-inset-left);
+                    padding-right: env(safe-area-inset-right); }
     }
 
     /* ── Penalty / terrain toast ── */
@@ -631,6 +705,16 @@
     <circle cx="1100" cy="168" r="4" fill="#EEECDA" opacity="0.9"/>
     <circle cx="1300" cy="175" r="3" fill="#C8D15A"/>
   </svg>
+
+  <!-- Fullscreen button (top-right, always visible) -->
+  <button id="menuFsBtn" title="Toggle Fullscreen" aria-label="Toggle Fullscreen">
+    <svg id="menuFsIcon" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M1 7V1H7"   stroke="#C8D15A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M19 7V1H13" stroke="#C8D15A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M1 13V19H7"  stroke="#C8D15A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M19 13V19H13" stroke="#C8D15A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
 
   <!-- Floating ⛳ flag -->
   <div class="deco" style="top:10%; left:6%; font-size:44px; --dur:3.6s; --ty:-13px; --r0:-7deg; --r1:-12deg;">⛳</div>
@@ -2209,14 +2293,21 @@ function toggleFullscreen() {
   }
 }
 
-// Update icon when fullscreen state changes
-document.addEventListener('fullscreenchange', () => {
-  const icon = document.getElementById('fsIcon');
-  if (!icon) return;
-  icon.innerHTML = document.fullscreenElement ? FS_COLLAPSE_PATHS : FS_EXPAND_PATHS;
-});
+// Sync both fullscreen icons (menu + game) when fullscreen state changes
+function syncFsIcons() {
+  const inner = document.fullscreenElement ? FS_COLLAPSE_PATHS : FS_EXPAND_PATHS;
+  const menuStroke = document.fullscreenElement ? 'white' : '#C8D15A';
+  // Game bar icon (white on teal bg)
+  const gi = document.getElementById('fsIcon');
+  if (gi) gi.innerHTML = inner;
+  // Menu icon (lime on dark semi-transparent bg) — rebuild with lime stroke
+  const mi = document.getElementById('menuFsIcon');
+  if (mi) mi.innerHTML = inner.replace(/stroke="white"/g, `stroke="${menuStroke}"`);
+}
+document.addEventListener('fullscreenchange', syncFsIcons);
 
 $('btnFullscreen').addEventListener('click', toggleFullscreen);
+document.getElementById('menuFsBtn').addEventListener('click', toggleFullscreen);
 
 // ─── Rotate overlay — only shown on touch devices in portrait ──────────────
 // Detects touch screen via pointer: coarse (more reliable than user-agent)
